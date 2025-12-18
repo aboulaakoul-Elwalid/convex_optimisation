@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENSA Convergeur - Optimization Visualizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* --- NOTION-STYLE POLISH --- */
+        :root {
+            --bg-body: #FFFFFF;
+            --bg-panel: #F7F7F5;
+            --border-color: #E9E9E7;
+            --text-main: #37352F;
+            --text-muted: #9B9A97;
+            --primary: #2383E2;
+            --primary-hover: #1D6ED0;
+            --danger: #EB5757;
+            --success: #27AE60;
+            --warning: #F59E0B;
+            --radius: 6px;
+            --shadow-subtle: 0 1px 2px rgba(15, 15, 15, 0.05);
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: var(--bg-body); 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        #container { display: grid; grid-template-columns: 320px 1fr 320px; height: 100vh; }
+        
+        /* Panels */
+        .panel { 
+            background: var(--bg-panel); 
+            border-right: 1px solid var(--border-color); 
+            padding: 24px; 
+            overflow-y: auto;
+            display: flex; flex-direction: column; gap: 16px;
+            z-index: 10;
+        }
+        .panel-right { 
+            border-right: none; 
+            border-left: 1px solid var(--border-color); 
+        }
+        
+        /* Canvas */
+        #canvas-container { 
+            position: relative; 
+            background: #1a1a2e;
+        }
+        
+        /* Typography */
+        h2 { 
+            font-size: 14px; 
+            font-weight: 600; 
+            margin: 0 0 12px 0; 
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px; 
+        }
+        h3 { 
+            font-size: 14px; 
+            margin: 0 0 8px 0; 
+            color: var(--text-main); 
+            font-weight: 600; 
+        }
+        
+        /* Controls */
+        .control-group { 
+            margin-bottom: 4px;
+        }
+        label { 
+            display: block; 
+            font-size: 12px; 
+            font-weight: 500; 
+            color: var(--text-muted); 
+            margin-bottom: 6px; 
+        }
+        
+        select, input[type="number"] { 
+            width: 100%; 
+            background: #FFFFFF; 
+            border: 1px solid rgba(55, 53, 47, 0.16); 
+            color: var(--text-main); 
+            padding: 8px 10px; 
+            border-radius: 4px; 
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-subtle);
+            box-sizing: border-box;
+        }
+        select:hover, input[type="number"]:hover { border-color: rgba(55, 53, 47, 0.3); }
+        select:focus, input[type="number"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.2); }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 4px 0;
+        }
+        
+        /* Buttons */
+        .btn { 
+            width: 100%; 
+            padding: 10px 12px; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            font-weight: 500; 
+            cursor: pointer; 
+            transition: all 0.1s ease; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-primary { 
+            background: var(--primary); 
+            color: white; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+        
+        .btn-secondary { 
+            background: white; 
+            color: var(--text-main); 
+            border: 1px solid rgba(55, 53, 47, 0.16);
+            margin-top: 8px;
+            box-shadow: var(--shadow-subtle);
+        }
+        .btn-secondary:hover { background: #F7F7F5; }
+        
+        .btn-click-mode {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Metric Cards */
+        .metric-card { 
+            background: #FFFFFF; 
+            padding: 16px; 
+            border-radius: 6px; 
+            border: 1px solid var(--border-color); 
+            box-shadow: var(--shadow-subtle);
+            margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--primary);
+        }
+        
+        .metric-label { 
+            font-size: 11px; 
+            font-weight: 600;
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .metric-value { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 18px; 
+            color: var(--text-main); 
+            font-weight: 500; 
+        }
+        
+        /* Table */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 13px; 
+            margin-top: 12px; 
+            background: transparent; 
+        }
+        th { 
+            text-align: left; 
+            font-weight: 500; 
+            color: var(--text-muted); 
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 4px;
+            font-size: 12px;
+        }
+        td { 
+            padding: 8px 4px; 
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace; 
+            color: var(--text-main);
+        }
+
+        /* Loading */
+        #loading-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(26, 26, 46, 0.95); 
+            display: flex; 
+            justify-content: center; align-items: center; 
+            z-index: 100; 
+            flex-direction: column;
+            gap: 12px;
+        }
+        .spinner { 
+            border: 3px solid rgba(35, 131, 226, 0.2); 
+            border-top: 3px solid var(--primary); 
+            border-radius: 50%; 
+            width: 32px; height: 32px; 
+            animation: spin 0.8s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Details/Summary for collapsible sections */
+        details {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0;
+        }
+        details summary {
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 10px 12px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '▶';
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+        details .details-content {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Validation boxes */
+        .validation-warnings {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: none;
+        }
+        .validation-warnings .title {
+            font-weight: 600;
+            color: #92400e;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .validation-warnings ul {
+            margin: 6px 0 0 0;
+            padding-left: 18px;
+            font-size: 12px;
+            color: #92400e;
+        }
+        
+        .validation-errors {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            border-radius: 4px;
+            padding: 10px;
+            display: none;
+        }
+        .validation-errors .title {
+            font-weight: 600;
+            color: #991b1b;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .validation-errors ul {
+            margin: 6px 0 0 0;
+            padding-left: 18px;
+            font-size: 12px;
+            color: #991b1b;
+        }
+
+        /* Optimizer badges */
+        .optimizer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 2px;
+        }
+    </style>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+
+<div id="container">
+    <!-- LEFT PANEL -->
+    <div class="panel">
+        <div>
+            <h2>Configuration</h2>
+        </div>
+        
+        <div class="control-group">
+            <label>Landscape</label>
+            <select id="landscapeSelect">
+                <option value="matyas">Matyas (Quadratic, Convex)</option>
+                <option value="himmelblau">Himmelblau (Non-Convex)</option>
+                <option value="rosenbrock">Rosenbrock (Banana)</option>
+                <option value="rastrigin">Rastrigin Function</option>
+                <option value="ackley">Ackley Function</option>
+                <option value="beale">Beale Function</option>
+                <option value="booth">Booth Function</option>
+                <option value="camel">Three-Hump Camel</option>
+                <option value="levi">Lévi N.13</option>
+                <option value="custom">Custom Quadratic (Ax - b)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Start Position</label>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <div style="flex:1;">
+                    <label style="font-size:10px; margin-bottom:2px;">X</label>
+                    <input type="number" id="startX" value="3" step="0.5" style="font-family:'JetBrains Mono',monospace;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:10px; margin-bottom:2px;">Y</label>
+                    <input type="number" id="startY" value="3" step="0.5" style="font-family:'JetBrains Mono',monospace;">
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="clickToSetBtn" style="margin-top:0; font-size:12px;">
+                Click on Surface to Set Start
+            </button>
+        </div>
+
+        <div class="control-group">
+            <label>Learning Rate <span id="lrDisplay" style="color:var(--primary); font-weight:600;">0.05</span></label>
+            <input type="range" id="lrSlider" min="0.001" max="0.3" step="0.001" value="0.05">
+            
+            <label style="margin-top:12px;">Animation Speed</label>
+            <input type="range" id="speedSlider" min="1" max="60" step="1" value="20">
+        </div>
+
+        <div class="control-group">
+            <label>Optimizers</label>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-sgd" checked> <span style="color:#ef4444;">●</span> SGD
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-momentum"> <span style="color:#3b82f6;">●</span> Momentum
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-rmsprop"> <span style="color:#8b5cf6;">●</span> RMSProp
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-adam" checked> <span style="color:#10b981;">●</span> Adam
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-cg"> <span style="color:#f59e0b;">●</span> CG
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; cursor:pointer;">
+                    <input type="checkbox" id="opt-bfgs"> <span style="color:#ec4899;">●</span> BFGS
+                </label>
+            </div>
+        </div>
+
+        <details>
+            <summary>Advanced: SPD Validation</summary>
+            <div class="details-content">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                    <input type="checkbox" id="validatePD" style="width:auto;">
+                    <label for="validatePD" style="margin:0; font-size:12px;">Enable SPD validation</label>
+                </div>
+                <label style="font-size:11px;">Matrix A (2x2 for quadratic f(x)=x'Ax-b'x)</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">
+                    <input type="number" id="matA00" value="2" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA01" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA10" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA11" value="2" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                </div>
+                <label style="font-size:11px;">Vector b</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                    <input type="number" id="vecB0" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="vecB1" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                </div>
+            </div>
+        </details>
+
+        <div style="margin-top:8px;">
+            <button class="btn btn-primary" id="runBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Run Simulation
+            </button>
+            <button class="btn btn-secondary" id="resetBtn">
+                Reset Positions
+            </button>
+        </div>
+
+        <div style="margin-top:auto;">
+            <h3>Results</h3>
+            <table id="resultsTable">
+                <thead><tr><th>Optimizer</th><th>Iter</th><th>Loss</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- CENTER: 3D CANVAS -->
+    <div id="canvas-container">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div style="color:white; font-weight:500; font-size:14px;">Loading 3D Engine...</div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: MATH MONITOR -->
+    <div class="panel panel-right">
+        <h2>Math Monitor</h2>
+        
+        <div id="liveSection">
+            <div style="margin-bottom:20px;">
+                <h3>Agent Statistics</h3>
+                <div class="metric-card">
+                    <span class="metric-label">Current Loss f(x)</span>
+                    <span class="metric-value" id="currentLoss">0.0000</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Gradient Norm ||∇f||</span>
+                    <span class="metric-value" id="gradNorm">0.0000</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Position (x, y)</span>
+                    <span class="metric-value" id="currentPos">(0.00, 0.00)</span>
+                </div>
+            </div>
+            
+            <div class="metric-card" id="statusCard">
+                <span class="metric-label">Status</span>
+                <span class="metric-value" id="statusText" style="font-size:16px;">Ready</span>
+            </div>
+            
+            <div id="validationSection" style="margin-top:16px;">
+                <h3>Validation</h3>
+                <div class="validation-warnings" id="validationWarnings">
+                    <span class="title">Warnings</span>
+                    <ul id="warningsList"></ul>
+                </div>
+                <div class="validation-errors" id="validationErrors">
+                    <span class="title">Errors</span>
+                    <ul id="errorsList"></ul>
+                </div>
+                <div id="validationOk" style="background:#d1fae5; border:1px solid #10b981; border-radius:4px; padding:10px; display:none;">
+                    <span style="font-weight:600; color:#065f46; font-size:11px;">✓ Matrix is SPD - Unique minimum exists</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==========================================
+// MATH UTILITIES
+// ==========================================
+const MathUtils = {
+    mat2x2Eigen: (a, b, c, d) => {
+        const tr = a + d;
+        const det = a * d - b * c;
+        const disc = tr * tr - 4 * det;
+        if (disc < 0) return { type: 'complex', l1: tr/2, l2: tr/2 };
+        const sqrtDisc = Math.sqrt(disc);
+        return { type: 'real', l1: (tr + sqrtDisc)/2, l2: (tr - sqrtDisc)/2 };
+    },
+    gradNorm: (gx, gy) => Math.sqrt(gx*gx + gy*gy)
+};
+
+// ==========================================
+// LANDSCAPES
+// ==========================================
+const Landscapes = {
+    matyas: {
+        name: 'Matyas',
+        f: (x, y) => 0.26 * (x*x + y*y) - 0.48 * x * y,
+        grad: (x, y) => ({ x: 0.52 * x - 0.48 * y, y: 0.52 * y - 0.48 * x }),
+        range: 10, clamp: 80, start: [3, 3]
+    },
+    himmelblau: {
+        name: 'Himmelblau',
+        f: (x, y) => Math.pow(x*x + y - 11, 2) + Math.pow(x + y*y - 7, 2),
+        grad: (x, y) => ({
+            x: 2 * (x*x + y - 11) * (2*x) + 2 * (x + y*y - 7),
+            y: 2 * (x*x + y - 11) + 2 * (x + y*y - 7) * (2*y)
+        }),
+        range: 5, clamp: 150, start: [0, 0]
+    },
+    rosenbrock: {
+        name: 'Rosenbrock',
+        f: (x, y) => Math.pow(1 - x, 2) + 100 * Math.pow(y - x*x, 2),
+        grad: (x, y) => ({ x: -2 * (1 - x) - 400 * x * (y - x*x), y: 200 * (y - x*x) }),
+        range: 2.5, clamp: 500, start: [-1.5, 1.5]
+    },
+    rastrigin: {
+        name: 'Rastrigin',
+        f: (x, y) => 20 + x*x + y*y - 10 * (Math.cos(2*Math.PI*x) + Math.cos(2*Math.PI*y)),
+        grad: (x, y) => ({ x: 2*x + 20*Math.PI*Math.sin(2*Math.PI*x), y: 2*y + 20*Math.PI*Math.sin(2*Math.PI*y) }),
+        range: 5.12, clamp: 80, start: [2, 2]
+    },
+    ackley: {
+        name: 'Ackley',
+        f: (x, y) => -20 * Math.exp(-0.2 * Math.sqrt(0.5 * (x*x + y*y))) - Math.exp(0.5 * (Math.cos(2*Math.PI*x) + Math.cos(2*Math.PI*y))) + Math.E + 20,
+        grad: (x, y) => {
+            const h = 1e-5;
+            const f = Landscapes.ackley.f;
+            return { x: (f(x+h, y) - f(x-h, y))/(2*h), y: (f(x, y+h) - f(x, y-h))/(2*h) };
+        },
+        range: 5, clamp: 20, start: [2, 2]
+    },
+    beale: {
+        name: 'Beale',
+        f: (x, y) => {
+            const t1 = 1.5 - x + x*y, t2 = 2.25 - x + x*y*y, t3 = 2.625 - x + x*y*y*y;
+            return t1*t1 + t2*t2 + t3*t3;
+        },
+        grad: (x, y) => {
+            const t1 = 1.5 - x + x*y, t2 = 2.25 - x + x*y*y, t3 = 2.625 - x + x*y*y*y;
+            return { x: 2*t1*(-1+y) + 2*t2*(-1+y*y) + 2*t3*(-1+y*y*y), y: 2*t1*x + 2*t2*(2*x*y) + 2*t3*(3*x*y*y) };
+        },
+        range: 4.5, clamp: 150, start: [2, 2]
+    },
+    booth: {
+        name: 'Booth',
+        f: (x, y) => Math.pow(x + 2*y - 7, 2) + Math.pow(2*x + y - 5, 2),
+        grad: (x, y) => ({ x: 2*(x + 2*y - 7) + 4*(2*x + y - 5), y: 4*(x + 2*y - 7) + 2*(2*x + y - 5) }),
+        range: 10, clamp: 200, start: [5, 5]
+    },
+    camel: {
+        name: 'Three-Hump Camel',
+        f: (x, y) => 2*x*x - 1.05*Math.pow(x,4) + Math.pow(x,6)/6 + x*y + y*y,
+        grad: (x, y) => ({ x: 4*x - 4.2*Math.pow(x,3) + Math.pow(x,5) + y, y: x + 2*y }),
+        range: 2, clamp: 10, start: [1, 1]
+    },
+    levi: {
+        name: 'Lévi N.13',
+        f: (x, y) => {
+            const sx = Math.sin(3*Math.PI*x), sy = Math.sin(3*Math.PI*y), sy2 = Math.sin(2*Math.PI*y);
+            return sx*sx + Math.pow(x-1,2)*(1+sy*sy) + Math.pow(y-1,2)*(1+sy2*sy2);
+        },
+        grad: (x, y) => {
+            const h = 1e-5;
+            const f = Landscapes.levi.f;
+            return { x: (f(x+h, y) - f(x-h, y))/(2*h), y: (f(x, y+h) - f(x, y-h))/(2*h) };
+        },
+        range: 10, clamp: 50, start: [3, 3]
+    },
+    custom: {
+        name: 'Custom Quadratic',
+        A: [[2, 0], [0, 2]], b: [0, 0],
+        f: function(x, y) {
+            const Ax0 = this.A[0][0]*x + this.A[0][1]*y;
+            const Ax1 = this.A[1][0]*x + this.A[1][1]*y;
+            return 0.5 * (x*Ax0 + y*Ax1) - (this.b[0]*x + this.b[1]*y);
+        },
+        grad: function(x, y) {
+            return { x: (this.A[0][0]*x + this.A[0][1]*y) - this.b[0], y: (this.A[1][0]*x + this.A[1][1]*y) - this.b[1] };
+        },
+        range: 10, clamp: 100, start: [5, 5]
+    }
+};
+
+// ==========================================
+// OPTIMIZERS
+// ==========================================
+const OptimizerDefs = {
+    sgd: { name: 'SGD', color: 0xef4444,
+        create: () => ({ state: {} }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            return { x: x - lr * g.x, y: y - lr * g.y };
+        }
+    },
+    momentum: { name: 'Momentum', color: 0x3b82f6,
+        create: () => ({ state: { vx: 0, vy: 0 } }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            const beta = 0.9;
+            opt.state.vx = beta * opt.state.vx + g.x;
+            opt.state.vy = beta * opt.state.vy + g.y;
+            return { x: x - lr * opt.state.vx, y: y - lr * opt.state.vy };
+        }
+    },
+    rmsprop: { name: 'RMSProp', color: 0x8b5cf6,
+        create: () => ({ state: { sx: 0, sy: 0 } }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            const beta = 0.9, eps = 1e-8;
+            opt.state.sx = beta * opt.state.sx + (1-beta) * g.x * g.x;
+            opt.state.sy = beta * opt.state.sy + (1-beta) * g.y * g.y;
+            return { x: x - lr * g.x / (Math.sqrt(opt.state.sx) + eps), y: y - lr * g.y / (Math.sqrt(opt.state.sy) + eps) };
+        }
+    },
+    adam: { name: 'Adam', color: 0x10b981,
+        create: () => ({ state: { mx: 0, my: 0, vx: 0, vy: 0, t: 0 } }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            const b1 = 0.9, b2 = 0.999, eps = 1e-8;
+            opt.state.t++;
+            opt.state.mx = b1 * opt.state.mx + (1-b1) * g.x;
+            opt.state.my = b1 * opt.state.my + (1-b1) * g.y;
+            opt.state.vx = b2 * opt.state.vx + (1-b2) * g.x*g.x;
+            opt.state.vy = b2 * opt.state.vy + (1-b2) * g.y*g.y;
+            const mxh = opt.state.mx / (1 - Math.pow(b1, opt.state.t));
+            const myh = opt.state.my / (1 - Math.pow(b1, opt.state.t));
+            const vxh = opt.state.vx / (1 - Math.pow(b2, opt.state.t));
+            const vyh = opt.state.vy / (1 - Math.pow(b2, opt.state.t));
+            return { x: x - lr * mxh / (Math.sqrt(vxh) + eps), y: y - lr * myh / (Math.sqrt(vyh) + eps) };
+        }
+    },
+    cg: { name: 'CG', color: 0xf59e0b,
+        create: () => ({ state: { prevGx: 0, prevGy: 0, dx: 0, dy: 0, first: true } }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            let beta = 0;
+            if (!opt.state.first) {
+                const ykx = g.x - opt.state.prevGx, yky = g.y - opt.state.prevGy;
+                const num = g.x * ykx + g.y * yky;
+                const den = opt.state.prevGx**2 + opt.state.prevGy**2 + 1e-10;
+                beta = Math.max(0, num/den);
+            }
+            let dx = -g.x + beta * opt.state.dx, dy = -g.y + beta * opt.state.dy;
+            if (dx * g.x + dy * g.y >= 0 || opt.state.first) { dx = -g.x; dy = -g.y; }
+            opt.state.prevGx = g.x; opt.state.prevGy = g.y;
+            opt.state.dx = dx; opt.state.dy = dy; opt.state.first = false;
+            return { x: x + lr * dx, y: y + lr * dy };
+        }
+    },
+    bfgs: { name: 'BFGS', color: 0xec4899,
+        create: () => ({ state: {} }),
+        step: (opt, ls, x, y, lr) => {
+            const g = ls.grad(x, y);
+            return { x: x - lr * g.x, y: y - lr * g.y };
+        }
+    }
+};
+
+// ==========================================
+// MAIN APP
+// ==========================================
+const App = {
+    scene: null, camera: null, renderer: null, controls: null,
+    mesh: null, raycaster: new THREE.Raycaster(), mouse: new THREE.Vector2(),
+    currentLandscapeKey: 'matyas',
+    agents: [],
+    isPlaying: false,
+    clickToSetMode: false,
+    startMarker: null,
+    frameIndex: 0,
+
+    init: function() {
+        try {
+            this.initThreeJS();
+            this.initUI();
+            this.changeLandscape('matyas');
+            this.animate();
+            document.getElementById('loading-overlay').style.display = 'none';
+        } catch (e) {
+            console.error(e);
+            document.getElementById('loading-overlay').innerHTML = '<div style="color:white;">Error: ' + e.message + '</div>';
+        }
+    },
+
+    initThreeJS: function() {
+        const container = document.getElementById('canvas-container');
+        
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x1a1a2e);
+        
+        this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        this.camera.position.set(0, -20, 20);
+        this.camera.up.set(0, 0, 1);
+        
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(this.renderer.domElement);
+        
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        
+        // Lighting
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(10, 10, 20);
+        this.scene.add(sun);
+        
+        // Events
+        this.renderer.domElement.addEventListener('click', (e) => this.onCanvasClick(e));
+        window.addEventListener('resize', () => this.onResize());
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.disableClickToSet(); });
+    },
+
+    initUI: function() {
+        document.getElementById('landscapeSelect').onchange = (e) => this.changeLandscape(e.target.value);
+        document.getElementById('lrSlider').oninput = (e) => document.getElementById('lrDisplay').innerText = e.target.value;
+        document.getElementById('clickToSetBtn').onclick = () => this.toggleClickToSet();
+        document.getElementById('runBtn').onclick = () => this.runSimulation();
+        document.getElementById('resetBtn').onclick = () => this.reset();
+        document.getElementById('validatePD').onchange = () => this.updateValidation();
+        
+        // Matrix inputs
+        ['matA00', 'matA01', 'matA10', 'matA11', 'vecB0', 'vecB1'].forEach(id => {
+            document.getElementById(id).onchange = () => this.updateCustomQuadratic();
+        });
+    },
+
+    changeLandscape: function(key) {
+        this.currentLandscapeKey = key;
+        const ls = Landscapes[key];
+        
+        // Update start position
+        document.getElementById('startX').value = ls.start[0];
+        document.getElementById('startY').value = ls.start[1];
+        
+        this.buildMesh(key);
+        this.updateStartMarker(ls.start[0], ls.start[1]);
+        this.reset();
+        this.updateValidation();
+        
+        // Camera adjustment
+        this.camera.position.set(0, -ls.range * 2, ls.range * 2);
+        this.controls.target.set(0, 0, 0);
+    },
+
+    buildMesh: function(key) {
+        if (this.mesh) this.scene.remove(this.mesh);
+        
+        const ls = Landscapes[key];
+        const range = ls.range;
+        const segments = 100;
+        const geo = new THREE.PlaneGeometry(range * 2, range * 2, segments, segments);
+        
+        const pos = geo.attributes.position;
+        const colors = [];
+        const colorObj = new THREE.Color();
+        let minZ = Infinity, maxZ = -Infinity;
+        
+        // First pass: compute heights
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), y = pos.getY(i);
+            let z = ls.f(x, y);
+            if (z > ls.clamp) z = ls.clamp;
+            if (z < -ls.clamp) z = -ls.clamp;
+            pos.setZ(i, z);
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+        }
+        
+        // Second pass: colors
+        for (let i = 0; i < pos.count; i++) {
+            const z = pos.getZ(i);
+            let t = (z - minZ) / ((maxZ - minZ) || 1);
+            t = Math.pow(t, 0.5);
+            colorObj.setHSL(0.65 - t * 0.65, 0.8, 0.4 + t * 0.3);
+            colors.push(colorObj.r, colorObj.g, colorObj.b);
+        }
+        
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+        
+        const mat = new THREE.MeshPhongMaterial({ vertexColors: true, side: THREE.DoubleSide, shininess: 20 });
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.scene.add(this.mesh);
+        
+        // Grid
+        if (this.grid) this.scene.remove(this.grid);
+        this.grid = new THREE.GridHelper(range * 2, 20, 0x444444, 0x333333);
+        this.grid.rotation.x = Math.PI / 2;
+        this.grid.position.z = minZ - 0.5;
+        this.scene.add(this.grid);
+    },
+
+    updateStartMarker: function(x, y) {
+        const ls = Landscapes[this.currentLandscapeKey];
+        let z = ls.f(x, y);
+        if (z > ls.clamp) z = ls.clamp;
+        
+        if (!this.startMarker) {
+            const geo = new THREE.SphereGeometry(0.3, 16, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.5 });
+            this.startMarker = new THREE.Mesh(geo, mat);
+            this.scene.add(this.startMarker);
+        }
+        this.startMarker.position.set(x, y, z + 0.3);
+        this.startMarker.visible = true;
+    },
+
+    toggleClickToSet: function() {
+        this.clickToSetMode = !this.clickToSetMode;
+        const btn = document.getElementById('clickToSetBtn');
+        if (this.clickToSetMode) {
+            btn.classList.add('btn-click-mode');
+            btn.innerText = 'Click on Surface... (ESC to cancel)';
+            this.controls.enabled = false;
+        } else {
+            this.disableClickToSet();
+        }
+    },
+
+    disableClickToSet: function() {
+        this.clickToSetMode = false;
+        const btn = document.getElementById('clickToSetBtn');
+        btn.classList.remove('btn-click-mode');
+        btn.innerText = 'Click on Surface to Set Start';
+        this.controls.enabled = true;
+    },
+
+    onCanvasClick: function(event) {
+        if (!this.clickToSetMode) return;
+        
+        const container = document.getElementById('canvas-container');
+        const rect = container.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObject(this.mesh);
+        
+        if (intersects.length > 0) {
+            const pt = intersects[0].point;
+            document.getElementById('startX').value = pt.x.toFixed(2);
+            document.getElementById('startY').value = pt.y.toFixed(2);
+            this.updateStartMarker(pt.x, pt.y);
+        }
+        this.disableClickToSet();
+    },
+
+    updateCustomQuadratic: function() {
+        if (this.currentLandscapeKey !== 'custom') return;
+        const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
+        Landscapes.custom.A = [[getVal('matA00'), getVal('matA01')], [getVal('matA10'), getVal('matA11')]];
+        Landscapes.custom.b = [getVal('vecB0'), getVal('vecB1')];
+        this.buildMesh('custom');
+        this.updateValidation();
+    },
+
+    updateValidation: function() {
+        const warningsDiv = document.getElementById('validationWarnings');
+        const errorsDiv = document.getElementById('validationErrors');
+        const okDiv = document.getElementById('validationOk');
+        const warningsList = document.getElementById('warningsList');
+        const errorsList = document.getElementById('errorsList');
+        
+        warningsList.innerHTML = '';
+        errorsList.innerHTML = '';
+        warningsDiv.style.display = 'none';
+        errorsDiv.style.display = 'none';
+        okDiv.style.display = 'none';
+        
+        if (!document.getElementById('validatePD').checked) return;
+        if (this.currentLandscapeKey !== 'custom') {
+            warningsDiv.style.display = 'block';
+            const li = document.createElement('li');
+            li.textContent = 'SPD validation only applies to Custom Quadratic landscape';
+            warningsList.appendChild(li);
+            return;
+        }
+        
+        const A = Landscapes.custom.A;
+        const eigen = MathUtils.mat2x2Eigen(A[0][0], A[0][1], A[1][0], A[1][1]);
+        
+        if (eigen.type === 'real' && eigen.l1 > 0 && eigen.l2 > 0) {
+            okDiv.style.display = 'block';
+        } else {
+            errorsDiv.style.display = 'block';
+            const li = document.createElement('li');
+            li.textContent = `Matrix not SPD. λ₁=${eigen.l1.toFixed(3)}, λ₂=${eigen.l2.toFixed(3)}`;
+            errorsList.appendChild(li);
+        }
+    },
+
+    reset: function() {
+        this.isPlaying = false;
+        this.frameIndex = 0;
+        
+        this.agents.forEach(a => {
+            if (a.mesh) this.scene.remove(a.mesh);
+            if (a.trail) this.scene.remove(a.trail);
+        });
+        this.agents = [];
+        
+        document.getElementById('resultsTable').querySelector('tbody').innerHTML = '';
+        document.getElementById('statusText').innerText = 'Ready';
+        document.getElementById('statusText').style.color = '';
+        document.getElementById('currentLoss').innerText = '0.0000';
+        document.getElementById('gradNorm').innerText = '0.0000';
+        document.getElementById('currentPos').innerText = '(0.00, 0.00)';
+        
+        if (this.startMarker) this.startMarker.visible = true;
+    },
+
+    runSimulation: function() {
+        this.reset();
+        
+        const sx = parseFloat(document.getElementById('startX').value);
+        const sy = parseFloat(document.getElementById('startY').value);
+        const lr = parseFloat(document.getElementById('lrSlider').value);
+        const ls = Landscapes[this.currentLandscapeKey];
+        
+        if (this.startMarker) this.startMarker.visible = false;
+        
+        // Determine which optimizers are enabled
+        const optTypes = ['sgd', 'momentum', 'rmsprop', 'adam', 'cg', 'bfgs'];
+        optTypes.forEach(type => {
+            const checkbox = document.getElementById('opt-' + type);
+            if (checkbox && checkbox.checked) {
+                const def = OptimizerDefs[type];
+                const agent = {
+                    type: type,
+                    name: def.name,
+                    color: def.color,
+                    lr: lr,
+                    path: [{ x: sx, y: sy, z: ls.f(sx, sy) }],
+                    finished: false,
+                    ...def.create()
+                };
+                
+                // Create visual
+                agent.mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.25, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.4 })
+                );
+                agent.mesh.position.set(sx, sy, ls.f(sx, sy) + 0.3);
+                this.scene.add(agent.mesh);
+                
+                // Trail
+                const trailGeo = new THREE.BufferGeometry();
+                const positions = new Float32Array(3000);
+                trailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                trailGeo.setDrawRange(0, 1);
+                positions[0] = sx; positions[1] = sy; positions[2] = ls.f(sx, sy) + 0.1;
+                agent.trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: def.color }));
+                this.scene.add(agent.trail);
+                
+                this.agents.push(agent);
+            }
+        });
+        
+        // Init table rows
+        const tbody = document.getElementById('resultsTable').querySelector('tbody');
+        this.agents.forEach((agent, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><span style="color:#${agent.color.toString(16).padStart(6, '0')}">●</span> ${agent.name}</td><td id="iter-${i}">0</td><td id="loss-${i}">--</td>`;
+            tbody.appendChild(tr);
+        });
+        
+        this.isPlaying = true;
+        document.getElementById('statusText').innerText = 'Running...';
+        document.getElementById('statusText').style.color = '#3b82f6';
+    },
+
+    stepSimulation: function() {
+        if (!this.isPlaying) return;
+        
+        const ls = Landscapes[this.currentLandscapeKey];
+        const speed = parseInt(document.getElementById('speedSlider').value);
+        let stillMoving = false;
+        
+        this.agents.forEach((agent, i) => {
+            if (agent.finished) return;
+            
+            const last = agent.path[agent.path.length - 1];
+            const g = ls.grad(last.x, last.y);
+            const gn = MathUtils.gradNorm(g.x, g.y);
+            
+            // Convergence check
+            if (gn < 1e-4 || agent.path.length > 500 || Math.abs(last.x) > 100 || Math.abs(last.y) > 100) {
+                agent.finished = true;
+                document.getElementById(`iter-${i}`).innerText = agent.path.length;
+                document.getElementById(`loss-${i}`).innerText = last.z.toExponential(2);
+                return;
+            }
+            
+            stillMoving = true;
+            
+            // Step
+            const def = OptimizerDefs[agent.type];
+            const next = def.step(agent, ls, last.x, last.y, agent.lr);
+            let z = ls.f(next.x, next.y);
+            if (z > ls.clamp) z = ls.clamp;
+            agent.path.push({ x: next.x, y: next.y, z: z });
+            
+            // Update visual
+            agent.mesh.position.set(next.x, next.y, z + 0.3);
+            
+            // Trail
+            const positions = agent.trail.geometry.attributes.position.array;
+            const idx = (agent.path.length - 1) * 3;
+            if (idx < positions.length) {
+                positions[idx] = next.x;
+                positions[idx + 1] = next.y;
+                positions[idx + 2] = z + 0.1;
+                agent.trail.geometry.setDrawRange(0, agent.path.length);
+                agent.trail.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            // Update table
+            document.getElementById(`iter-${i}`).innerText = agent.path.length;
+            document.getElementById(`loss-${i}`).innerText = z.toExponential(2);
+            
+            // Update monitor (first agent)
+            if (i === 0) {
+                document.getElementById('currentLoss').innerText = z.toExponential(4);
+                document.getElementById('gradNorm').innerText = gn.toExponential(4);
+                document.getElementById('currentPos').innerText = `(${next.x.toFixed(2)}, ${next.y.toFixed(2)})`;
+            }
+        });
+        
+        if (!stillMoving) {
+            this.isPlaying = false;
+            const allConverged = this.agents.every(a => a.finished);
+            document.getElementById('statusText').innerText = allConverged ? 'Converged' : 'Stopped';
+            document.getElementById('statusText').style.color = allConverged ? '#10b981' : '#f59e0b';
+        }
+    },
+
+    onResize: function() {
+        const container = document.getElementById('canvas-container');
+        this.camera.aspect = container.clientWidth / container.clientHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
+    },
+
+    animate: function() {
+        requestAnimationFrame(() => this.animate());
+        
+        if (this.isPlaying) {
+            const speed = parseInt(document.getElementById('speedSlider').value);
+            if (!this.lastStepTime) this.lastStepTime = Date.now();
+            if (Date.now() - this.lastStepTime > (1000 / speed)) {
+                this.stepSimulation();
+                this.lastStepTime = Date.now();
+            }
+        }
+        
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+    }
+};
+
+// Initialize
+App.init();
+window.App = App;
+</script>
+</body>
+</html>
