@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Optimizer Visualization - See How Optimizers Navigate Loss Surfaces</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a15;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 280px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-panel h1 {
+            color: #00d4ff;
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+        }
+
+        .control-panel .subtitle {
+            color: #666;
+            font-size: 0.8rem;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #888;
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 0.85rem;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .value-display {
+            text-align: right;
+            color: #00d4ff;
+            font-family: monospace;
+            font-size: 0.8rem;
+            margin-top: 3px;
+        }
+
+        /* Optimizer checkboxes */
+        .optimizer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .optimizer-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .optimizer-item input {
+            width: 16px;
+            height: 16px;
+        }
+
+        .optimizer-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .optimizer-name {
+            flex: 1;
+            font-size: 0.85rem;
+        }
+
+        .optimizer-loss {
+            font-family: monospace;
+            color: #666;
+            font-size: 0.75rem;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        .info-panel h2 {
+            color: #ffaa00;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .stat-box {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #00d4ff;
+            font-family: monospace;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .formula-box {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #00ff88;
+            margin-top: 10px;
+            white-space: pre-line;
+        }
+
+        .explanation {
+            font-size: 0.8rem;
+            color: #aaa;
+            line-height: 1.5;
+            margin-top: 12px;
+        }
+
+        /* Instructions overlay */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 0.8rem;
+            color: #888;
+            display: flex;
+            gap: 20px;
+        }
+
+        .instructions span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .key {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        /* Gradient indicator */
+        .gradient-arrow {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            background: rgba(10, 10, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .gradient-arrow h3 {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .arrow-canvas {
+            width: 80px;
+            height: 80px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <h1>3D Optimizer Viz</h1>
+        <p class="subtitle">Drag to rotate | Scroll to zoom | Click surface to set start</p>
+
+        <div class="control-group">
+            <label>Landscape</label>
+            <select id="landscape-select">
+                <option value="valley">Valley (x² + ky²)</option>
+                <option value="saddle">Saddle Point (x² - y²)</option>
+                <option value="rosenbrock">Rosenbrock Banana</option>
+                <option value="beale">Beale Function</option>
+                <option value="rastrigin">Rastrigin (many minima)</option>
+            </select>
+        </div>
+
+        <div class="control-group" id="condition-group">
+            <label>Valley Steepness (Condition Number)</label>
+            <input type="range" id="condition" min="1" max="100" value="50">
+            <div class="value-display">k = <span id="condition-val">50</span></div>
+        </div>
+
+        <div class="control-group">
+            <label>Animation Steps</label>
+            <input type="range" id="steps" min="20" max="200" value="100">
+            <div class="value-display"><span id="steps-val">100</span> steps</div>
+        </div>
+
+        <div class="control-group">
+            <label>Speed</label>
+            <input type="range" id="speed" min="1" max="100" value="50">
+        </div>
+
+        <div class="control-group">
+            <label>Optimizers</label>
+            <div id="optimizer-list"></div>
+        </div>
+
+        <button class="btn btn-primary" id="run-btn">▶ Run Optimization</button>
+        <button class="btn btn-secondary" id="reset-btn">↺ Reset</button>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h2>Live Stats</h2>
+        <div class="stats-row">
+            <div class="stat-box">
+                <div class="stat-value" id="stat-step">0</div>
+                <div class="stat-label">Step</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-loss">-</div>
+                <div class="stat-label">Best Loss</div>
+            </div>
+        </div>
+
+        <h2 id="opt-title">Click an optimizer</h2>
+        <div class="formula-box" id="opt-formula">Select an optimizer to see its update rule</div>
+        <p class="explanation" id="opt-explanation">
+            Watch how different optimizers navigate the loss surface. 
+            The Valley landscape shows why SGD bounces - the gradient in one direction is much larger than the other.
+        </p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+        <span><span class="key">Drag</span> Rotate view</span>
+        <span><span class="key">Scroll</span> Zoom</span>
+        <span><span class="key">Click</span> Set start point</span>
+        <span><span class="key">Space</span> Play/Pause</span>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const SURFACE_SIZE = 10;
+        const SURFACE_SEGMENTS = 80;
+        const PATH_HEIGHT_OFFSET = 0.05;
+
+        // ==========================================
+        // LANDSCAPES
+        // ==========================================
+        const landscapes = {
+            valley: {
+                name: "Valley",
+                fn: (x, y, k = 50) => x * x + k * y * y,
+                grad: (x, y, k = 50) => [2 * x, 2 * k * y],
+                hessian: (x, y, k = 50) => [[2, 0], [0, 2 * k]],
+                optimum: [0, 0],
+                range: { x: [-4, 4], y: [-4, 4] },
+                scale: 0.02,
+                description: "f(x,y) = x² + ky². The y-direction is k times steeper, causing SGD to bounce."
+            },
+            saddle: {
+                name: "Saddle Point",
+                fn: (x, y) => x * x - y * y,
+                grad: (x, y) => [2 * x, -2 * y],
+                hessian: (x, y) => [[2, 0], [0, -2]],
+                optimum: [0, 0],
+                range: { x: [-3, 3], y: [-3, 3] },
+                scale: 0.08,
+                description: "f(x,y) = x² - y². A saddle point where optimizers can get stuck on the plateau."
+            },
+            rosenbrock: {
+                name: "Rosenbrock",
+                fn: (x, y) => Math.pow(1 - x, 2) + 100 * Math.pow(y - x * x, 2),
+                grad: (x, y) => [
+                    -2 * (1 - x) - 400 * x * (y - x * x),
+                    200 * (y - x * x)
+                ],
+                hessian: (x, y) => [
+                    [2 + 1200 * x * x - 400 * y, -400 * x],
+                    [-400 * x, 200]
+                ],
+                optimum: [1, 1],
+                range: { x: [-2, 2], y: [-1, 3] },
+                scale: 0.003,
+                description: "The classic 'banana valley'. The global minimum is inside a long, narrow, parabolic valley."
+            },
+            beale: {
+                name: "Beale",
+                fn: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return a * a + b * b + c * c;
+                },
+                grad: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return [
+                        2 * a * (-1 + y) + 2 * b * (-1 + y * y) + 2 * c * (-1 + y * y * y),
+                        2 * a * x + 2 * b * 2 * x * y + 2 * c * 3 * x * y * y
+                    ];
+                },
+                hessian: null,
+                optimum: [3, 0.5],
+                range: { x: [-4, 4], y: [-4, 4] },
+                scale: 0.008,
+                description: "Multiple valleys with flat regions. Tests optimizer's ability to navigate complex terrain."
+            },
+            rastrigin: {
+                name: "Rastrigin",
+                fn: (x, y) => 20 + x * x - 10 * Math.cos(2 * Math.PI * x) + y * y - 10 * Math.cos(2 * Math.PI * y),
+                grad: (x, y) => [
+                    2 * x + 20 * Math.PI * Math.sin(2 * Math.PI * x),
+                    2 * y + 20 * Math.PI * Math.sin(2 * Math.PI * y)
+                ],
+                hessian: (x, y) => [
+                    [2 + 40 * Math.PI * Math.PI * Math.cos(2 * Math.PI * x), 0],
+                    [0, 2 + 40 * Math.PI * Math.PI * Math.cos(2 * Math.PI * y)]
+                ],
+                optimum: [0, 0],
+                range: { x: [-3, 3], y: [-3, 3] },
+                scale: 0.03,
+                description: "Many local minima. Shows how optimizers can get trapped in local optima."
+            }
+        };
+
+        // ==========================================
+        // OPTIMIZERS
+        // ==========================================
+        const optimizerConfigs = [
+            {
+                id: 'sgd',
+                name: 'SGD',
+                color: 0xff4444,
+                defaultLr: 0.02,
+                formula: 'w = w - lr × ∇f(w)',
+                description: 'Vanilla gradient descent. Takes steps proportional to the gradient.',
+                create: (lr) => ({
+                    lr,
+                    step: function(grad) {
+                        return [-this.lr * grad[0], -this.lr * grad[1]];
+                    },
+                    reset: function() {}
+                })
+            },
+            {
+                id: 'momentum',
+                name: 'Momentum',
+                color: 0x4444ff,
+                defaultLr: 0.02,
+                formula: 'v = 0.9×v + ∇f\nw = w - lr × v',
+                description: 'Accumulates velocity over time. Helps escape local minima and smooths oscillations.',
+                create: (lr) => ({
+                    lr,
+                    v: [0, 0],
+                    step: function(grad) {
+                        this.v[0] = 0.9 * this.v[0] + grad[0];
+                        this.v[1] = 0.9 * this.v[1] + grad[1];
+                        return [-this.lr * this.v[0], -this.lr * this.v[1]];
+                    },
+                    reset: function() { this.v = [0, 0]; }
+                })
+            },
+            {
+                id: 'rmsprop',
+                name: 'RMSProp',
+                color: 0xff44ff,
+                defaultLr: 0.1,
+                formula: 'v = 0.999×v + 0.001×∇f²\nw = w - lr × ∇f/√v',
+                description: 'Divides by running average of squared gradients. Adapts learning rate per parameter.',
+                create: (lr) => ({
+                    lr,
+                    v: [1e-8, 1e-8],
+                    step: function(grad) {
+                        this.v[0] = 0.999 * this.v[0] + 0.001 * grad[0] * grad[0];
+                        this.v[1] = 0.999 * this.v[1] + 0.001 * grad[1] * grad[1];
+                        return [
+                            -this.lr * grad[0] / (Math.sqrt(this.v[0]) + 1e-8),
+                            -this.lr * grad[1] / (Math.sqrt(this.v[1]) + 1e-8)
+                        ];
+                    },
+                    reset: function() { this.v = [1e-8, 1e-8]; }
+                })
+            },
+            {
+                id: 'adam',
+                name: 'Adam',
+                color: 0x44ff44,
+                defaultLr: 0.3,
+                formula: 'm = 0.9×m + 0.1×∇f\nv = 0.999×v + 0.001×∇f²\nw = w - lr × m̂/√(v̂+ε)',
+                description: 'Combines momentum (m) with adaptive learning rate (v). The most popular optimizer in deep learning.',
+                create: (lr) => ({
+                    lr,
+                    m: [0, 0],
+                    v: [1e-8, 1e-8],
+                    t: 0,
+                    step: function(grad) {
+                        this.t++;
+                        this.m[0] = 0.9 * this.m[0] + 0.1 * grad[0];
+                        this.m[1] = 0.9 * this.m[1] + 0.1 * grad[1];
+                        this.v[0] = 0.999 * this.v[0] + 0.001 * grad[0] * grad[0];
+                        this.v[1] = 0.999 * this.v[1] + 0.001 * grad[1] * grad[1];
+                        const bc1 = 1 - Math.pow(0.9, this.t);
+                        const bc2 = 1 - Math.pow(0.999, this.t);
+                        const mHat = [this.m[0] / bc1, this.m[1] / bc1];
+                        const vHat = [this.v[0] / bc2, this.v[1] / bc2];
+                        return [
+                            -this.lr * mHat[0] / (Math.sqrt(vHat[0]) + 1e-8),
+                            -this.lr * mHat[1] / (Math.sqrt(vHat[1]) + 1e-8)
+                        ];
+                    },
+                    reset: function() { this.m = [0, 0]; this.v = [1e-8, 1e-8]; this.t = 0; }
+                })
+            },
+            {
+                id: 'newton',
+                name: 'Newton',
+                color: 0xffaa00,
+                defaultLr: 1.0,
+                formula: 'w = w - H⁻¹ × ∇f(w)\nH = Hessian matrix',
+                description: 'Uses second-order derivatives. Converges in ONE step for quadratic functions!',
+                create: (lr) => ({
+                    lr,
+                    step: function(grad, hessian) {
+                        if (!hessian) return [-0.01 * grad[0], -0.01 * grad[1]];
+                        const [[a, b], [_, c]] = hessian;
+                        const det = a * c - b * b;
+                        if (Math.abs(det) < 1e-10) return [-0.01 * grad[0], -0.01 * grad[1]];
+                        return [
+                            -this.lr * (c * grad[0] - b * grad[1]) / det,
+                            -this.lr * (-b * grad[0] + a * grad[1]) / det
+                        ];
+                    },
+                    reset: function() {}
+                })
+            },
+            {
+                id: 'muon',
+                name: 'Muon',
+                color: 0x00ffff,
+                defaultLr: 0.5,
+                formula: 'v = 0.9×v + ∇f\nG = v / ||v||  (normalize)\nw = w - lr × G',
+                description: 'Momentum + Orthogonalization. Normalizes the gradient direction so all parameters move at the same speed. Used in modern LLM training (Muon optimizer).',
+                create: (lr) => ({
+                    lr,
+                    v: [0, 0],
+                    step: function(grad) {
+                        // Momentum accumulation
+                        this.v[0] = 0.9 * this.v[0] + grad[0];
+                        this.v[1] = 0.9 * this.v[1] + grad[1];
+                        
+                        // Orthogonalization: normalize to unit vector
+                        // This is the key insight of Muon - all directions get equal step size
+                        const norm = Math.sqrt(this.v[0] * this.v[0] + this.v[1] * this.v[1]);
+                        
+                        if (norm < 1e-10) {
+                            return [0, 0];
+                        }
+                        
+                        // Return normalized direction scaled by learning rate
+                        return [-this.lr * this.v[0] / norm, -this.lr * this.v[1] / norm];
+                    },
+                    reset: function() { this.v = [0, 0]; }
+                })
+            }
+        ];
+
+        // ==========================================
+        // STATE
+        // ==========================================
+        let currentLandscape = 'valley';
+        let condition = 50;
+        let maxSteps = 100;
+        let startPoint = [-3, 2];
+        let isRunning = false;
+        let currentStep = 0;
+        let paths = {};
+        let activeOptimizers = {};
+        let animationFrameId = null;
+
+        // Three.js objects
+        let scene, camera, renderer, controls;
+        let surfaceMesh, startMarker, optimumMarker;
+        let pathLines = {};
+        let pathBalls = {};
+
+        // ==========================================
+        // THREE.JS SETUP
+        // ==========================================
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a15);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(8, 8, 8);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 3;
+            controls.maxDistance = 20;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            const directionalLight2 = new THREE.DirectionalLight(0x00d4ff, 0.3);
+            directionalLight2.position.set(-5, 5, -5);
+            scene.add(directionalLight2);
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(10, 20, 0x333333, 0x222222);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            // Axes helper
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            // Create surface
+            createSurface();
+
+            // Create markers
+            createMarkers();
+
+            // Raycaster for clicking
+            setupRaycaster();
+
+            // Handle resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Start render loop
+            animate();
+        }
+
+        function createSurface() {
+            if (surfaceMesh) {
+                scene.remove(surfaceMesh);
+                surfaceMesh.geometry.dispose();
+                surfaceMesh.material.dispose();
+            }
+
+            const land = landscapes[currentLandscape];
+            const geometry = new THREE.PlaneGeometry(
+                SURFACE_SIZE, SURFACE_SIZE,
+                SURFACE_SEGMENTS, SURFACE_SEGMENTS
+            );
+
+            // Modify vertices based on loss function
+            const positions = geometry.attributes.position.array;
+            const colors = new Float32Array(positions.length);
+
+            let minZ = Infinity, maxZ = -Infinity;
+
+            // First pass: calculate Z values and find min/max
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = positions[i];
+                const y = positions[i + 1];
+                
+                // Map from geometry coords to function coords
+                const range = land.range;
+                const fx = x / (SURFACE_SIZE / 2) * (range.x[1] - range.x[0]) / 2;
+                const fy = y / (SURFACE_SIZE / 2) * (range.y[1] - range.y[0]) / 2;
+                
+                let z = land.fn(fx, fy, condition);
+                z = Math.min(z, 500); // Clamp extreme values
+                z *= land.scale;
+                
+                positions[i + 2] = z;
+                
+                if (z < minZ) minZ = z;
+                if (z > maxZ) maxZ = z;
+            }
+
+            // Second pass: assign colors based on height
+            for (let i = 0; i < positions.length; i += 3) {
+                const z = positions[i + 2];
+                const t = (z - minZ) / (maxZ - minZ + 0.001);
+                
+                // Color gradient: blue (low) -> green -> yellow -> red (high)
+                let r, g, b;
+                if (t < 0.25) {
+                    r = 0; g = t * 4; b = 1;
+                } else if (t < 0.5) {
+                    r = 0; g = 1; b = 1 - (t - 0.25) * 4;
+                } else if (t < 0.75) {
+                    r = (t - 0.5) * 4; g = 1; b = 0;
+                } else {
+                    r = 1; g = 1 - (t - 0.75) * 4; b = 0;
+                }
+                
+                colors[i] = r;
+                colors[i + 1] = g;
+                colors[i + 2] = b;
+            }
+
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.computeVertexNormals();
+
+            // Rotate to XZ plane
+            geometry.rotateX(-Math.PI / 2);
+
+            const material = new THREE.MeshPhongMaterial({
+                vertexColors: true,
+                side: THREE.DoubleSide,
+                shininess: 30,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            surfaceMesh = new THREE.Mesh(geometry, material);
+            scene.add(surfaceMesh);
+        }
+
+        function createMarkers() {
+            // Start point marker (white sphere)
+            const startGeom = new THREE.SphereGeometry(0.15, 16, 16);
+            const startMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x444444 });
+            startMarker = new THREE.Mesh(startGeom, startMat);
+            scene.add(startMarker);
+            updateStartMarker();
+
+            // Optimum marker (yellow star-like)
+            const optimumGeom = new THREE.SphereGeometry(0.12, 16, 16);
+            const optimumMat = new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x666600 });
+            optimumMarker = new THREE.Mesh(optimumGeom, optimumMat);
+            scene.add(optimumMarker);
+            updateOptimumMarker();
+        }
+
+        function updateStartMarker() {
+            const land = landscapes[currentLandscape];
+            const [x, y] = startPoint;
+            const z = land.fn(x, y, condition) * land.scale + PATH_HEIGHT_OFFSET;
+            
+            // Convert to Three.js coords
+            const range = land.range;
+            const threeX = x / ((range.x[1] - range.x[0]) / 2) * (SURFACE_SIZE / 2);
+            const threeZ = y / ((range.y[1] - range.y[0]) / 2) * (SURFACE_SIZE / 2);
+            
+            startMarker.position.set(threeX, z, threeZ);
+        }
+
+        function updateOptimumMarker() {
+            const land = landscapes[currentLandscape];
+            const [x, y] = land.optimum;
+            const z = land.fn(x, y, condition) * land.scale + 0.1;
+            
+            const range = land.range;
+            const threeX = x / ((range.x[1] - range.x[0]) / 2) * (SURFACE_SIZE / 2);
+            const threeZ = y / ((range.y[1] - range.y[0]) / 2) * (SURFACE_SIZE / 2);
+            
+            optimumMarker.position.set(threeX, z, threeZ);
+        }
+
+        function worldToThree(x, y) {
+            const land = landscapes[currentLandscape];
+            const range = land.range;
+            
+            // Clamp to valid range
+            const clampedX = Math.max(range.x[0], Math.min(range.x[1], x));
+            const clampedY = Math.max(range.y[0], Math.min(range.y[1], y));
+            
+            const threeX = clampedX / ((range.x[1] - range.x[0]) / 2) * (SURFACE_SIZE / 2);
+            const threeZ = clampedY / ((range.y[1] - range.y[0]) / 2) * (SURFACE_SIZE / 2);
+            
+            let loss = land.fn(clampedX, clampedY, condition);
+            loss = Math.min(loss, 500); // Same clamp as surface
+            const threeY = loss * land.scale + PATH_HEIGHT_OFFSET;
+            
+            return new THREE.Vector3(threeX, threeY, threeZ);
+        }
+
+        function threeToWorld(threeX, threeZ) {
+            const land = landscapes[currentLandscape];
+            const range = land.range;
+            const x = threeX / (SURFACE_SIZE / 2) * ((range.x[1] - range.x[0]) / 2);
+            const y = threeZ / (SURFACE_SIZE / 2) * ((range.y[1] - range.y[0]) / 2);
+            return [x, y];
+        }
+
+        // ==========================================
+        // RAYCASTER FOR CLICK DETECTION
+        // ==========================================
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('click', (event) => {
+                if (isRunning) return;
+                
+                // Ignore clicks on UI panels
+                if (event.target !== renderer.domElement) return;
+
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Try to intersect with surface mesh
+                const intersects = raycaster.intersectObject(surfaceMesh, true);
+
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    startPoint = threeToWorld(point.x, point.z);
+                } else {
+                    // Fallback: intersect with XZ plane at y=0
+                    const planeNormal = new THREE.Vector3(0, 1, 0);
+                    const planePoint = new THREE.Vector3(0, 0, 0);
+                    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, planePoint);
+                    const intersection = new THREE.Vector3();
+                    
+                    if (raycaster.ray.intersectPlane(plane, intersection)) {
+                        startPoint = threeToWorld(intersection.x, intersection.z);
+                    } else {
+                        return; // No valid intersection
+                    }
+                }
+                
+                // Clamp to range with small padding
+                const land = landscapes[currentLandscape];
+                const pad = 0.05;
+                startPoint[0] = Math.max(land.range.x[0] + pad, Math.min(land.range.x[1] - pad, startPoint[0]));
+                startPoint[1] = Math.max(land.range.y[0] + pad, Math.min(land.range.y[1] - pad, startPoint[1]));
+                
+                updateStartMarker();
+                clearPaths();
+                updateStats();
+            });
+        }
+
+        // ==========================================
+        // PATH VISUALIZATION
+        // ==========================================
+        function createPathLine(optId, color) {
+            // Remove existing
+            if (pathLines[optId]) {
+                scene.remove(pathLines[optId]);
+                pathLines[optId].geometry.dispose();
+                pathLines[optId].material.dispose();
+            }
+            if (pathBalls[optId]) {
+                scene.remove(pathBalls[optId]);
+            }
+
+            // Create line
+            const material = new THREE.LineBasicMaterial({ 
+                color: color,
+                linewidth: 2
+            });
+            const geometry = new THREE.BufferGeometry();
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            pathLines[optId] = line;
+
+            // Create ball
+            const ballGeom = new THREE.SphereGeometry(0.1, 12, 12);
+            const ballMat = new THREE.MeshPhongMaterial({ 
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.3
+            });
+            const ball = new THREE.Mesh(ballGeom, ballMat);
+            scene.add(ball);
+            pathBalls[optId] = ball;
+        }
+
+        function updatePathLine(optId, path) {
+            if (!pathLines[optId] || path.length < 1) return;
+
+            const points = path.map(([x, y]) => worldToThree(x, y));
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            
+            pathLines[optId].geometry.dispose();
+            pathLines[optId].geometry = geometry;
+
+            // Update ball position
+            const lastPoint = points[points.length - 1];
+            pathBalls[optId].position.copy(lastPoint);
+        }
+
+        function clearPaths() {
+            for (const optId of Object.keys(pathLines)) {
+                scene.remove(pathLines[optId]);
+                pathLines[optId].geometry.dispose();
+                pathLines[optId].material.dispose();
+                scene.remove(pathBalls[optId]);
+            }
+            pathLines = {};
+            pathBalls = {};
+            paths = {};
+            currentStep = 0;
+        }
+
+        // ==========================================
+        // OPTIMIZATION LOOP
+        // ==========================================
+        function runOptimization() {
+            if (isRunning) {
+                pauseOptimization();
+                return;
+            }
+
+            isRunning = true;
+            document.getElementById('run-btn').textContent = '⏸ Pause';
+
+            // Initialize if starting fresh
+            if (currentStep === 0) {
+                paths = {};
+                activeOptimizers = {};
+
+                const enabledOpts = getEnabledOptimizers();
+                for (const config of enabledOpts) {
+                    paths[config.id] = [[...startPoint]];
+                    activeOptimizers[config.id] = config.create(config.defaultLr);
+                    createPathLine(config.id, config.color);
+                }
+            }
+
+            optimizationStep();
+        }
+
+        function pauseOptimization() {
+            isRunning = false;
+            document.getElementById('run-btn').textContent = '▶ Resume';
+        }
+
+        function optimizationStep() {
+            if (!isRunning || currentStep >= maxSteps) {
+                isRunning = false;
+                document.getElementById('run-btn').textContent = '▶ Run Optimization';
+                return;
+            }
+
+            const land = landscapes[currentLandscape];
+
+            for (const [optId, opt] of Object.entries(activeOptimizers)) {
+                const path = paths[optId];
+                const [x, y] = path[path.length - 1];
+
+                // Compute gradient
+                const grad = land.grad(x, y, condition);
+
+                // Compute Hessian for Newton
+                let hessian = null;
+                if (optId === 'newton' && land.hessian) {
+                    hessian = land.hessian(x, y, condition);
+                }
+
+                // Take step
+                const step = opt.step(grad, hessian);
+                let newX = x + step[0];
+                let newY = y + step[1];
+
+                // Clamp to range with padding to keep balls visible
+                const pad = 0.1;
+                newX = Math.max(land.range.x[0] + pad, Math.min(land.range.x[1] - pad, newX));
+                newY = Math.max(land.range.y[0] + pad, Math.min(land.range.y[1] - pad, newY));
+
+                // Also limit step size to prevent huge jumps
+                const maxStep = 0.5;
+                if (Math.abs(step[0]) > maxStep || Math.abs(step[1]) > maxStep) {
+                    const stepNorm = Math.sqrt(step[0]*step[0] + step[1]*step[1]);
+                    if (stepNorm > maxStep) {
+                        newX = x + step[0] / stepNorm * maxStep;
+                        newY = y + step[1] / stepNorm * maxStep;
+                    }
+                }
+
+                path.push([newX, newY]);
+                updatePathLine(optId, path);
+            }
+
+            currentStep++;
+            updateStats();
+
+            // Schedule next step
+            const speed = parseInt(document.getElementById('speed').value);
+            const delay = 200 - speed * 1.9;
+            setTimeout(optimizationStep, delay);
+        }
+
+        function resetOptimization() {
+            isRunning = false;
+            document.getElementById('run-btn').textContent = '▶ Run Optimization';
+            clearPaths();
+            currentStep = 0;
+            
+            // Reset optimizer states
+            for (const opt of Object.values(activeOptimizers)) {
+                if (opt.reset) opt.reset();
+            }
+            activeOptimizers = {};
+            
+            updateStats();
+        }
+
+        // ==========================================
+        // UI HELPERS
+        // ==========================================
+        function getEnabledOptimizers() {
+            return optimizerConfigs.filter(config => {
+                const cb = document.getElementById(`opt-${config.id}`);
+                return cb && cb.checked;
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('stat-step').textContent = currentStep;
+
+            const land = landscapes[currentLandscape];
+            let bestLoss = Infinity;
+
+            for (const path of Object.values(paths)) {
+                if (path.length > 0) {
+                    const [x, y] = path[path.length - 1];
+                    const loss = land.fn(x, y, condition);
+                    if (loss < bestLoss) bestLoss = loss;
+                }
+            }
+
+            document.getElementById('stat-loss').textContent = 
+                bestLoss < Infinity ? bestLoss.toFixed(4) : '-';
+
+            // Update optimizer losses
+            for (const config of optimizerConfigs) {
+                const el = document.getElementById(`loss-${config.id}`);
+                if (el && paths[config.id]) {
+                    const path = paths[config.id];
+                    if (path.length > 0) {
+                        const [x, y] = path[path.length - 1];
+                        const loss = land.fn(x, y, condition);
+                        el.textContent = loss.toFixed(2);
+                    }
+                }
+            }
+        }
+
+        function buildOptimizerList() {
+            const container = document.getElementById('optimizer-list');
+            container.innerHTML = '';
+
+            for (const config of optimizerConfigs) {
+                const div = document.createElement('div');
+                div.className = 'optimizer-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="opt-${config.id}" 
+                           ${['sgd', 'adam', 'muon'].includes(config.id) ? 'checked' : ''}>
+                    <div class="optimizer-color" style="background: #${config.color.toString(16).padStart(6, '0')}"></div>
+                    <span class="optimizer-name">${config.name}</span>
+                    <span class="optimizer-loss" id="loss-${config.id}">-</span>
+                `;
+
+                div.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox') {
+                        showOptimizerInfo(config);
+                    }
+                });
+
+                container.appendChild(div);
+            }
+        }
+
+        function showOptimizerInfo(config) {
+            document.getElementById('opt-title').textContent = config.name;
+            document.getElementById('opt-formula').textContent = config.formula;
+            document.getElementById('opt-explanation').textContent = config.description;
+        }
+
+        // ==========================================
+        // EVENT HANDLERS
+        // ==========================================
+        document.getElementById('landscape-select').addEventListener('change', (e) => {
+            currentLandscape = e.target.value;
+            document.getElementById('condition-group').style.display = 
+                currentLandscape === 'valley' ? 'block' : 'none';
+
+            // Reset start point
+            const land = landscapes[currentLandscape];
+            startPoint = [
+                land.range.x[0] * 0.6 + land.range.x[1] * 0.4,
+                land.range.y[0] * 0.4 + land.range.y[1] * 0.6
+            ];
+
+            createSurface();
+            updateStartMarker();
+            updateOptimumMarker();
+            resetOptimization();
+
+            // Update description
+            document.getElementById('opt-explanation').textContent = land.description;
+        });
+
+        document.getElementById('condition').addEventListener('input', (e) => {
+            condition = parseInt(e.target.value);
+            document.getElementById('condition-val').textContent = condition;
+            createSurface();
+            updateStartMarker();
+            updateOptimumMarker();
+            resetOptimization();
+        });
+
+        document.getElementById('steps').addEventListener('input', (e) => {
+            maxSteps = parseInt(e.target.value);
+            document.getElementById('steps-val').textContent = maxSteps;
+        });
+
+        document.getElementById('run-btn').addEventListener('click', runOptimization);
+        document.getElementById('reset-btn').addEventListener('click', resetOptimization);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (isRunning) pauseOptimization();
+                else runOptimization();
+            }
+        });
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==========================================
+        // RENDER LOOP
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            
+            // Rotate optimum marker for visibility
+            if (optimumMarker) {
+                optimumMarker.rotation.y += 0.02;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // ==========================================
+        // INIT
+        // ==========================================
+        buildOptimizerList();
+        initThree();
+        updateStats();
+
+        // Show initial info
+        showOptimizerInfo(optimizerConfigs.find(o => o.id === 'adam'));
+    </script>
+</body>
+</html>

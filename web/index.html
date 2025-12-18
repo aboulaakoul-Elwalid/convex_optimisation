@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimizer Visualization - Learn How SGD, Momentum, Adam Work</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #00d4ff;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        /* Canvas area */
+        #canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            border-radius: 8px;
+            cursor: crosshair;
+            background: #0a0a15;
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            padding: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .value-display {
+            text-align: right;
+            color: #00d4ff;
+            font-family: monospace;
+            margin-top: 4px;
+        }
+
+        /* Optimizer checkboxes */
+        .optimizer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .optimizer-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .optimizer-item:hover {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .optimizer-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .optimizer-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .optimizer-name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .optimizer-loss {
+            font-family: monospace;
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Info panel */
+        .info-section {
+            margin-bottom: 20px;
+        }
+
+        .info-section h3 {
+            color: #ffaa00;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+
+        .info-section p {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #aaa;
+        }
+
+        .formula {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 0.85rem;
+            color: #00ff88;
+            overflow-x: auto;
+        }
+
+        /* Stats display */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00d4ff;
+            font-family: monospace;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        /* Animation controls */
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .speed-control label {
+            white-space: nowrap;
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+
+        /* Legend at bottom of canvas */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* Gradient explanation */
+        .gradient-arrow {
+            display: inline-block;
+            margin: 0 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00d4ff;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 250px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Optimizer Visualization</h1>
+    <p class="subtitle">Click on the landscape to set start point • Watch optimizers race to the minimum</p>
+
+    <div class="container">
+        <!-- Left Panel: Controls -->
+        <div class="panel">
+            <h2>Controls</h2>
+
+            <div class="control-group">
+                <label>Landscape</label>
+                <select id="landscape-select">
+                    <option value="valley">Valley (x² + ky²) - SGD bouncing</option>
+                    <option value="saddle">Saddle Point (x² - y²) - Plateau problem</option>
+                    <option value="rosenbrock">Rosenbrock - Banana valley</option>
+                    <option value="beale">Beale - Multiple valleys</option>
+                    <option value="rastrigin">Rastrigin - Many local minima</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="condition-control">
+                <label>Condition Number (Valley steepness)</label>
+                <input type="range" id="condition" min="1" max="100" value="50">
+                <div class="value-display" id="condition-value">50</div>
+            </div>
+
+            <div class="control-group">
+                <label>Steps</label>
+                <input type="range" id="steps" min="20" max="300" value="100">
+                <div class="value-display" id="steps-value">100</div>
+            </div>
+
+            <h2 style="margin-top: 20px;">Optimizers</h2>
+            <div class="optimizer-list" id="optimizer-list">
+                <!-- Filled by JS -->
+            </div>
+
+            <div class="speed-control">
+                <label>Speed:</label>
+                <input type="range" id="speed" min="1" max="100" value="50" style="flex:1">
+            </div>
+
+            <button class="btn btn-primary" id="run-btn" style="margin-top: 20px;">
+                ▶ Run Optimization
+            </button>
+            <button class="btn btn-secondary" id="reset-btn">
+                ↺ Reset
+            </button>
+        </div>
+
+        <!-- Center: Canvas -->
+        <div class="panel" id="canvas-container">
+            <h2>Loss Landscape</h2>
+            <canvas id="canvas" width="700" height="600"></canvas>
+            <div class="legend" id="legend"></div>
+        </div>
+
+        <!-- Right Panel: Learning Info -->
+        <div class="panel">
+            <h2>Understanding</h2>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-step">0</div>
+                    <div class="stat-label">Step</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-best">-</div>
+                    <div class="stat-label">Best Loss</div>
+                </div>
+            </div>
+
+            <div class="info-section" style="margin-top: 20px;">
+                <h3 id="info-title">Select an optimizer to learn</h3>
+                <p id="info-description">Click on an optimizer checkbox to see its formula and explanation.</p>
+                <div class="formula" id="info-formula" style="display:none;"></div>
+            </div>
+
+            <div class="info-section">
+                <h3>Why SGD Bounces in Valley</h3>
+                <p>
+                    The Valley has formula <strong>f(x,y) = x² + 50y²</strong>. 
+                    The gradient in y is <strong>50x larger</strong> than in x.
+                </p>
+                <p style="margin-top: 10px;">
+                    SGD takes step: <code>w = w - lr × grad</code>
+                </p>
+                <p style="margin-top: 10px;">
+                    Big y-gradient → big y-step → <strong>overshoots</strong> → bounces back!
+                </p>
+            </div>
+
+            <div class="info-section">
+                <h3>Why Adam Works</h3>
+                <p>
+                    Adam divides by <code>√v</code> where <code>v ≈ grad²</code>.
+                    This <strong>normalizes</strong> the step size:
+                </p>
+                <div class="formula">step ≈ grad / |grad| = ±1</div>
+                <p>
+                    Large gradients get divided by large values → controlled steps!
+                </p>
+            </div>
+
+            <div class="info-section">
+                <h3>Gradient at Current Point</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="grad-x">-</div>
+                        <div class="stat-label">∂f/∂x</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="grad-y">-</div>
+                        <div class="stat-label">∂f/∂y</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // LANDSCAPES - Loss functions with gradients
+        // ==========================================
+        const landscapes = {
+            valley: {
+                name: "Valley",
+                fn: (x, y, k = 50) => x * x + k * y * y,
+                grad: (x, y, k = 50) => [2 * x, 2 * k * y],
+                optimum: [0, 0],
+                range: { x: [-10, 10], y: [-5, 5] }
+            },
+            saddle: {
+                name: "Saddle Point",
+                fn: (x, y) => x * x - y * y,
+                grad: (x, y) => [2 * x, -2 * y],
+                optimum: [0, 0],
+                range: { x: [-5, 5], y: [-5, 5] }
+            },
+            rosenbrock: {
+                name: "Rosenbrock",
+                fn: (x, y) => Math.pow(1 - x, 2) + 100 * Math.pow(y - x * x, 2),
+                grad: (x, y) => [
+                    -2 * (1 - x) - 400 * x * (y - x * x),
+                    200 * (y - x * x)
+                ],
+                optimum: [1, 1],
+                range: { x: [-2, 2], y: [-1, 3] }
+            },
+            beale: {
+                name: "Beale",
+                fn: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return a * a + b * b + c * c;
+                },
+                grad: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return [
+                        2 * a * (-1 + y) + 2 * b * (-1 + y * y) + 2 * c * (-1 + y * y * y),
+                        2 * a * x + 2 * b * 2 * x * y + 2 * c * 3 * x * y * y
+                    ];
+                },
+                optimum: [3, 0.5],
+                range: { x: [-4.5, 4.5], y: [-4.5, 4.5] }
+            },
+            rastrigin: {
+                name: "Rastrigin",
+                fn: (x, y) => 20 + x * x - 10 * Math.cos(2 * Math.PI * x) + y * y - 10 * Math.cos(2 * Math.PI * y),
+                grad: (x, y) => [
+                    2 * x + 20 * Math.PI * Math.sin(2 * Math.PI * x),
+                    2 * y + 20 * Math.PI * Math.sin(2 * Math.PI * y)
+                ],
+                optimum: [0, 0],
+                range: { x: [-5, 5], y: [-5, 5] }
+            }
+        };
+
+        // ==========================================
+        // OPTIMIZERS - Implementation from scratch
+        // ==========================================
+        const optimizerConfigs = [
+            {
+                id: 'sgd',
+                name: 'SGD',
+                color: '#ff4444',
+                defaultLr: 0.02,
+                description: 'Vanilla gradient descent. Simple but bounces in narrow valleys.',
+                formula: 'w = w - lr × ∇f(w)',
+                create: (lr) => ({
+                    lr,
+                    step: function(grad) {
+                        return [-this.lr * grad[0], -this.lr * grad[1]];
+                    },
+                    reset: function() {}
+                })
+            },
+            {
+                id: 'momentum',
+                name: 'Momentum',
+                color: '#4444ff',
+                defaultLr: 0.02,
+                beta: 0.9,
+                description: 'SGD with velocity accumulation. Smooths oscillations but can overshoot.',
+                formula: 'v = βv + ∇f(w)\nw = w - lr × v',
+                create: (lr, beta = 0.9) => ({
+                    lr,
+                    beta,
+                    v: [0, 0],
+                    step: function(grad) {
+                        this.v[0] = this.beta * this.v[0] + grad[0];
+                        this.v[1] = this.beta * this.v[1] + grad[1];
+                        return [-this.lr * this.v[0], -this.lr * this.v[1]];
+                    },
+                    reset: function() { this.v = [0, 0]; }
+                })
+            },
+            {
+                id: 'rmsprop',
+                name: 'RMSProp',
+                color: '#ff44ff',
+                defaultLr: 0.1,
+                beta: 0.999,
+                description: 'Divides by running average of squared gradients. Adapts step size per dimension.',
+                formula: 'v = βv + (1-β)∇f²\nw = w - lr × ∇f / √(v + ε)',
+                create: (lr, beta = 0.999) => ({
+                    lr,
+                    beta,
+                    v: [1e-8, 1e-8],
+                    step: function(grad) {
+                        this.v[0] = this.beta * this.v[0] + (1 - this.beta) * grad[0] * grad[0];
+                        this.v[1] = this.beta * this.v[1] + (1 - this.beta) * grad[1] * grad[1];
+                        return [
+                            -this.lr * grad[0] / (Math.sqrt(this.v[0]) + 1e-8),
+                            -this.lr * grad[1] / (Math.sqrt(this.v[1]) + 1e-8)
+                        ];
+                    },
+                    reset: function() { this.v = [1e-8, 1e-8]; }
+                })
+            },
+            {
+                id: 'adam',
+                name: 'Adam',
+                color: '#44ff44',
+                defaultLr: 0.3,
+                beta1: 0.9,
+                beta2: 0.999,
+                description: 'Combines momentum (m) with RMSProp (v). The most popular optimizer.',
+                formula: 'm = β₁m + (1-β₁)∇f\nv = β₂v + (1-β₂)∇f²\nw = w - lr × m̂ / √(v̂ + ε)',
+                create: (lr, beta1 = 0.9, beta2 = 0.999) => ({
+                    lr,
+                    beta1,
+                    beta2,
+                    m: [0, 0],
+                    v: [1e-8, 1e-8],
+                    t: 0,
+                    step: function(grad) {
+                        this.t++;
+                        // Update biased first moment
+                        this.m[0] = this.beta1 * this.m[0] + (1 - this.beta1) * grad[0];
+                        this.m[1] = this.beta1 * this.m[1] + (1 - this.beta1) * grad[1];
+                        // Update biased second moment
+                        this.v[0] = this.beta2 * this.v[0] + (1 - this.beta2) * grad[0] * grad[0];
+                        this.v[1] = this.beta2 * this.v[1] + (1 - this.beta2) * grad[1] * grad[1];
+                        // Bias correction
+                        const bc1 = 1 - Math.pow(this.beta1, this.t);
+                        const bc2 = 1 - Math.pow(this.beta2, this.t);
+                        const mHat = [this.m[0] / bc1, this.m[1] / bc1];
+                        const vHat = [this.v[0] / bc2, this.v[1] / bc2];
+                        return [
+                            -this.lr * mHat[0] / (Math.sqrt(vHat[0]) + 1e-8),
+                            -this.lr * mHat[1] / (Math.sqrt(vHat[1]) + 1e-8)
+                        ];
+                    },
+                    reset: function() { this.m = [0, 0]; this.v = [1e-8, 1e-8]; this.t = 0; }
+                })
+            },
+            {
+                id: 'newton',
+                name: 'Newton',
+                color: '#ffaa00',
+                defaultLr: 1.0,
+                description: 'Uses second derivatives (Hessian). Converges instantly for quadratic functions!',
+                formula: 'w = w - H⁻¹∇f(w)\n(H = Hessian matrix)',
+                create: (lr = 1.0) => ({
+                    lr,
+                    step: function(grad, hessian) {
+                        // For 2D: H = [[a, b], [b, c]], H^-1 = 1/det * [[c, -b], [-b, a]]
+                        if (!hessian) return [-this.lr * grad[0], -this.lr * grad[1]];
+                        const [[a, b], [_, c]] = hessian;
+                        const det = a * c - b * b;
+                        if (Math.abs(det) < 1e-10) return [-this.lr * grad[0] * 0.01, -this.lr * grad[1] * 0.01];
+                        return [
+                            -this.lr * (c * grad[0] - b * grad[1]) / det,
+                            -this.lr * (-b * grad[0] + a * grad[1]) / det
+                        ];
+                    },
+                    reset: function() {}
+                })
+            },
+            {
+                id: 'muon',
+                name: 'Muon',
+                color: '#00ffff',
+                defaultLr: 0.5,
+                description: 'Momentum + Orthogonalization. Normalizes gradient direction so all parameters move at same speed. Used in modern LLM training.',
+                formula: 'v = 0.9×v + ∇f\nG = v / ||v||  (normalize)\nw = w - lr × G',
+                create: (lr) => ({
+                    lr,
+                    v: [0, 0],
+                    step: function(grad) {
+                        // Momentum accumulation
+                        this.v[0] = 0.9 * this.v[0] + grad[0];
+                        this.v[1] = 0.9 * this.v[1] + grad[1];
+                        
+                        // Orthogonalization: normalize to unit vector
+                        const norm = Math.sqrt(this.v[0] * this.v[0] + this.v[1] * this.v[1]);
+                        
+                        if (norm < 1e-10) {
+                            return [0, 0];
+                        }
+                        
+                        // Return normalized direction scaled by learning rate
+                        return [-this.lr * this.v[0] / norm, -this.lr * this.v[1] / norm];
+                    },
+                    reset: function() { this.v = [0, 0]; }
+                })
+            }
+        ];
+
+        // Hessian functions for Newton
+        const hessians = {
+            valley: (x, y, k = 50) => [[2, 0], [0, 2 * k]],
+            saddle: (x, y) => [[2, 0], [0, -2]],
+            rosenbrock: (x, y) => [
+                [2 + 1200 * x * x - 400 * y, -400 * x],
+                [-400 * x, 200]
+            ],
+            beale: null,  // Too complex
+            rastrigin: (x, y) => [
+                [2 + 40 * Math.PI * Math.PI * Math.cos(2 * Math.PI * x), 0],
+                [0, 2 + 40 * Math.PI * Math.PI * Math.cos(2 * Math.PI * y)]
+            ]
+        };
+
+        // ==========================================
+        // STATE
+        // ==========================================
+        let currentLandscape = 'valley';
+        let condition = 50;
+        let steps = 100;
+        let startPoint = [-8, 3];
+        let animationId = null;
+        let currentStep = 0;
+        let paths = {};  // { optimizerId: [[x,y], ...] }
+        let activeOptimizers = {};  // { optimizerId: optimizer instance }
+        let isRunning = false;
+
+        // ==========================================
+        // CANVAS SETUP
+        // ==========================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // ==========================================
+        // RENDERING
+        // ==========================================
+        function worldToCanvas(x, y) {
+            const land = landscapes[currentLandscape];
+            const xRange = land.range.x;
+            const yRange = land.range.y;
+            const px = (x - xRange[0]) / (xRange[1] - xRange[0]) * canvas.width;
+            const py = (1 - (y - yRange[0]) / (yRange[1] - yRange[0])) * canvas.height;
+            return [px, py];
+        }
+
+        function canvasToWorld(px, py) {
+            const land = landscapes[currentLandscape];
+            const xRange = land.range.x;
+            const yRange = land.range.y;
+            const x = px / canvas.width * (xRange[1] - xRange[0]) + xRange[0];
+            const y = (1 - py / canvas.height) * (yRange[1] - yRange[0]) + yRange[0];
+            return [x, y];
+        }
+
+        function drawLandscape() {
+            const land = landscapes[currentLandscape];
+            const xRange = land.range.x;
+            const yRange = land.range.y;
+            
+            // Create image data for heatmap
+            const imageData = ctx.createImageData(canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Calculate loss values and find min/max
+            let minLoss = Infinity, maxLoss = -Infinity;
+            const lossGrid = [];
+            
+            for (let py = 0; py < canvas.height; py++) {
+                const row = [];
+                for (let px = 0; px < canvas.width; px++) {
+                    const [x, y] = canvasToWorld(px, py);
+                    let loss = land.fn(x, y, condition);
+                    // Clamp extreme values
+                    loss = Math.min(loss, 1000);
+                    row.push(loss);
+                    if (loss < minLoss) minLoss = loss;
+                    if (loss > maxLoss) maxLoss = loss;
+                }
+                lossGrid.push(row);
+            }
+            
+            // Apply log scale for better visualization
+            const logMin = Math.log(minLoss - minLoss + 1);
+            const logMax = Math.log(maxLoss - minLoss + 1);
+            
+            // Draw heatmap with viridis-like colormap
+            for (let py = 0; py < canvas.height; py++) {
+                for (let px = 0; px < canvas.width; px++) {
+                    const loss = lossGrid[py][px];
+                    const logLoss = Math.log(loss - minLoss + 1);
+                    const t = (logLoss - logMin) / (logMax - logMin + 0.001);
+                    
+                    // Viridis-inspired colormap
+                    const r = Math.floor(70 + t * 180);
+                    const g = Math.floor(50 + (1 - Math.abs(t - 0.5) * 2) * 150);
+                    const b = Math.floor(150 - t * 100);
+                    
+                    const idx = (py * canvas.width + px) * 4;
+                    data[idx] = r;
+                    data[idx + 1] = g;
+                    data[idx + 2] = b;
+                    data[idx + 3] = 255;
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Draw contour lines
+            drawContours(lossGrid, minLoss, maxLoss);
+            
+            // Draw optimum marker
+            const [optX, optY] = land.optimum;
+            const [optPx, optPy] = worldToCanvas(optX, optY);
+            ctx.beginPath();
+            ctx.arc(optPx, optPy, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffff00';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw star inside
+            drawStar(optPx, optPy, 5, 6, 3);
+        }
+
+        function drawContours(lossGrid, minLoss, maxLoss) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1;
+            
+            const numContours = 15;
+            const logMin = Math.log(minLoss + 1);
+            const logMax = Math.log(maxLoss + 1);
+            
+            for (let c = 1; c < numContours; c++) {
+                const t = c / numContours;
+                const logLevel = logMin + t * (logMax - logMin);
+                const level = Math.exp(logLevel) - 1 + minLoss;
+                
+                // Simple marching squares
+                for (let py = 0; py < canvas.height - 1; py += 4) {
+                    for (let px = 0; px < canvas.width - 1; px += 4) {
+                        const v00 = lossGrid[py][px];
+                        const v10 = lossGrid[py][Math.min(px + 4, canvas.width - 1)];
+                        const v01 = lossGrid[Math.min(py + 4, canvas.height - 1)][px];
+                        const v11 = lossGrid[Math.min(py + 4, canvas.height - 1)][Math.min(px + 4, canvas.width - 1)];
+                        
+                        // Check if contour crosses this cell
+                        const above = [v00 > level, v10 > level, v01 > level, v11 > level];
+                        const sum = above.reduce((a, b) => a + b, 0);
+                        
+                        if (sum > 0 && sum < 4) {
+                            ctx.beginPath();
+                            ctx.arc(px + 2, py + 2, 1, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawStar(cx, cy, spikes, outerR, innerR) {
+            ctx.beginPath();
+            ctx.fillStyle = '#000';
+            for (let i = 0; i < spikes * 2; i++) {
+                const r = i % 2 === 0 ? outerR : innerR;
+                const angle = (i * Math.PI / spikes) - Math.PI / 2;
+                const x = cx + r * Math.cos(angle);
+                const y = cy + r * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawStartPoint() {
+            const [px, py] = worldToCanvas(startPoint[0], startPoint[1]);
+            ctx.beginPath();
+            ctx.arc(px, py, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawPaths() {
+            for (const [optId, path] of Object.entries(paths)) {
+                if (path.length < 2) continue;
+                
+                const config = optimizerConfigs.find(o => o.id === optId);
+                if (!config) continue;
+                
+                ctx.beginPath();
+                ctx.strokeStyle = config.color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                const [startPx, startPy] = worldToCanvas(path[0][0], path[0][1]);
+                ctx.moveTo(startPx, startPy);
+                
+                for (let i = 1; i < path.length; i++) {
+                    const [px, py] = worldToCanvas(path[i][0], path[i][1]);
+                    ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                // Draw current position
+                const [curX, curY] = path[path.length - 1];
+                const [curPx, curPy] = worldToCanvas(curX, curY);
+                ctx.beginPath();
+                ctx.arc(curPx, curPy, 6, 0, Math.PI * 2);
+                ctx.fillStyle = config.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        function render() {
+            drawLandscape();
+            drawStartPoint();
+            drawPaths();
+        }
+
+        // ==========================================
+        // ANIMATION
+        // ==========================================
+        function runOptimization() {
+            if (isRunning) return;
+            isRunning = true;
+            document.getElementById('run-btn').textContent = '⏸ Running...';
+            
+            // Initialize
+            paths = {};
+            activeOptimizers = {};
+            currentStep = 0;
+            
+            const enabledOpts = getEnabledOptimizers();
+            for (const config of enabledOpts) {
+                paths[config.id] = [[...startPoint]];
+                activeOptimizers[config.id] = config.create(config.defaultLr);
+            }
+            
+            animate();
+        }
+
+        function animate() {
+            if (currentStep >= steps) {
+                isRunning = false;
+                document.getElementById('run-btn').textContent = '▶ Run Optimization';
+                updateStats();
+                return;
+            }
+            
+            const land = landscapes[currentLandscape];
+            const hessianFn = hessians[currentLandscape];
+            
+            for (const [optId, opt] of Object.entries(activeOptimizers)) {
+                const path = paths[optId];
+                const [x, y] = path[path.length - 1];
+                
+                // Compute gradient
+                const grad = land.grad(x, y, condition);
+                
+                // Compute Hessian for Newton
+                let hessian = null;
+                if (optId === 'newton' && hessianFn) {
+                    hessian = hessianFn(x, y, condition);
+                }
+                
+                // Take step
+                const step = opt.step(grad, hessian);
+                const newX = x + step[0];
+                const newY = y + step[1];
+                
+                // Clamp to range
+                const xRange = land.range.x;
+                const yRange = land.range.y;
+                const clampedX = Math.max(xRange[0], Math.min(xRange[1], newX));
+                const clampedY = Math.max(yRange[0], Math.min(yRange[1], newY));
+                
+                path.push([clampedX, clampedY]);
+            }
+            
+            currentStep++;
+            render();
+            updateStats();
+            
+            // Speed control: 1-100 maps to 200ms - 5ms delay
+            const speed = parseInt(document.getElementById('speed').value);
+            const delay = 200 - speed * 1.95;
+            
+            animationId = setTimeout(animate, delay);
+        }
+
+        function reset() {
+            if (animationId) clearTimeout(animationId);
+            isRunning = false;
+            paths = {};
+            activeOptimizers = {};
+            currentStep = 0;
+            document.getElementById('run-btn').textContent = '▶ Run Optimization';
+            document.getElementById('stat-step').textContent = '0';
+            document.getElementById('stat-best').textContent = '-';
+            render();
+        }
+
+        // ==========================================
+        // UI HELPERS
+        // ==========================================
+        function getEnabledOptimizers() {
+            return optimizerConfigs.filter(config => {
+                const checkbox = document.getElementById(`opt-${config.id}`);
+                return checkbox && checkbox.checked;
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('stat-step').textContent = currentStep;
+            
+            const land = landscapes[currentLandscape];
+            let bestLoss = Infinity;
+            
+            for (const path of Object.values(paths)) {
+                if (path.length > 0) {
+                    const [x, y] = path[path.length - 1];
+                    const loss = land.fn(x, y, condition);
+                    if (loss < bestLoss) bestLoss = loss;
+                }
+            }
+            
+            document.getElementById('stat-best').textContent = bestLoss < Infinity 
+                ? bestLoss.toFixed(4) 
+                : '-';
+            
+            // Update gradient display for start point
+            const grad = land.grad(startPoint[0], startPoint[1], condition);
+            document.getElementById('grad-x').textContent = grad[0].toFixed(1);
+            document.getElementById('grad-y').textContent = grad[1].toFixed(1);
+            
+            // Update optimizer losses in list
+            for (const config of optimizerConfigs) {
+                const lossEl = document.getElementById(`loss-${config.id}`);
+                if (lossEl && paths[config.id]) {
+                    const path = paths[config.id];
+                    if (path.length > 0) {
+                        const [x, y] = path[path.length - 1];
+                        const loss = land.fn(x, y, condition);
+                        lossEl.textContent = loss.toFixed(2);
+                    }
+                }
+            }
+        }
+
+        function buildOptimizerList() {
+            const container = document.getElementById('optimizer-list');
+            container.innerHTML = '';
+            
+            for (const config of optimizerConfigs) {
+                const div = document.createElement('div');
+                div.className = 'optimizer-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="opt-${config.id}" ${['sgd', 'adam'].includes(config.id) ? 'checked' : ''}>
+                    <div class="optimizer-color" style="background: ${config.color}"></div>
+                    <span class="optimizer-name">${config.name}</span>
+                    <span class="optimizer-loss" id="loss-${config.id}">-</span>
+                `;
+                
+                // Show info on click
+                div.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox') {
+                        showOptimizerInfo(config);
+                    }
+                });
+                
+                container.appendChild(div);
+            }
+            
+            // Build legend
+            const legend = document.getElementById('legend');
+            legend.innerHTML = optimizerConfigs.map(c => `
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: ${c.color}"></div>
+                    <span>${c.name}</span>
+                </div>
+            `).join('');
+        }
+
+        function showOptimizerInfo(config) {
+            document.getElementById('info-title').textContent = config.name;
+            document.getElementById('info-description').textContent = config.description;
+            document.getElementById('info-formula').textContent = config.formula;
+            document.getElementById('info-formula').style.display = 'block';
+        }
+
+        // ==========================================
+        // EVENT HANDLERS
+        // ==========================================
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            startPoint = canvasToWorld(px, py);
+            reset();
+            render();
+            updateStats();
+        });
+
+        document.getElementById('landscape-select').addEventListener('change', (e) => {
+            currentLandscape = e.target.value;
+            document.getElementById('condition-control').style.display = 
+                currentLandscape === 'valley' ? 'block' : 'none';
+            
+            // Reset start point to reasonable location
+            const land = landscapes[currentLandscape];
+            startPoint = [
+                land.range.x[0] * 0.7 + land.range.x[1] * 0.3,
+                land.range.y[0] * 0.3 + land.range.y[1] * 0.7
+            ];
+            
+            reset();
+        });
+
+        document.getElementById('condition').addEventListener('input', (e) => {
+            condition = parseInt(e.target.value);
+            document.getElementById('condition-value').textContent = condition;
+            reset();
+        });
+
+        document.getElementById('steps').addEventListener('input', (e) => {
+            steps = parseInt(e.target.value);
+            document.getElementById('steps-value').textContent = steps;
+        });
+
+        document.getElementById('run-btn').addEventListener('click', () => {
+            if (isRunning) {
+                if (animationId) clearTimeout(animationId);
+                isRunning = false;
+                document.getElementById('run-btn').textContent = '▶ Run Optimization';
+            } else {
+                runOptimization();
+            }
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', reset);
+
+        // ==========================================
+        // INIT
+        // ==========================================
+        buildOptimizerList();
+        render();
+        updateStats();
+    </script>
+</body>
+</html>

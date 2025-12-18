@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Training Visualization - NCCL Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a15;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-panel h1 {
+            color: #00d4ff;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .control-panel .subtitle {
+            color: #888;
+            font-size: 0.75rem;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .section h2 {
+            color: #ffaa00;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #888;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 0.85rem;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 6px;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .value-display {
+            text-align: right;
+            color: #00d4ff;
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        /* Mode toggle */
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #888;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .mode-btn.active {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            color: #00d4ff;
+        }
+
+        .mode-btn:hover:not(.active) {
+            border-color: rgba(255,255,255,0.4);
+            color: #aaa;
+        }
+
+        .mode-btn .icon {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* LLM Preset Buttons */
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .preset-btn {
+            padding: 8px 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #aaa;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            border-color: #00d4ff;
+            color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .preset-btn.active {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+        }
+
+        /* Model Card */
+        .model-card {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,170,0,0.3);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .model-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .model-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #ffaa00;
+        }
+
+        .model-badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(78, 205, 196, 0.2);
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+
+        .model-badge.moe {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+        }
+
+        .model-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+        }
+
+        .model-stat {
+            text-align: center;
+        }
+
+        .model-stat .stat-label {
+            display: block;
+            font-size: 0.6rem;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .model-stat .stat-val {
+            font-size: 0.75rem;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* GPU/Node cards grid */
+        .gpu-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .gpu-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            border-left: 3px solid;
+            min-width: 0; /* Prevents flex overflow */
+        }
+
+        /* 4-GPU Color Scheme */
+        .gpu-card.gpu0 { border-color: #ff6b6b; } /* Red */
+        .gpu-card.gpu1 { border-color: #4ecdc4; } /* Teal */
+        .gpu-card.gpu2 { border-color: #ffe66d; } /* Yellow */
+        .gpu-card.gpu3 { border-color: #c44dff; } /* Purple */
+
+        .gpu-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gpu-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .gpu-name {
+            font-weight: 600;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #aaa;
+        }
+
+        .gpu-loss {
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 340px;
+            backdrop-filter: blur(10px);
+        }
+
+        .info-panel h2 {
+            color: #ffaa00;
+            font-size: 1rem;
+            margin-bottom: 12px;
+        }
+
+        .explanation {
+            font-size: 0.8rem;
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .explanation strong {
+            color: #00d4ff;
+        }
+
+        .explanation.warning {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .explanation.success {
+            color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #00ff88;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00d4ff;
+            font-family: monospace;
+        }
+
+        .stat-value.bad { color: #ff6b6b; }
+        .stat-value.good { color: #4ecdc4; }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* NCCL animation overlay */
+        .nccl-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.5);
+            border-radius: 12px;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nccl-status {
+            font-size: 0.85rem;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .nccl-animation {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nccl-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        .nccl-dot:nth-child(1) { background: #ff6b6b; animation-delay: 0s; }
+        .nccl-dot:nth-child(2) { background: #4ecdc4; animation-delay: 0.2s; }
+        .nccl-arrow {
+            color: #00d4ff;
+            font-size: 1.2rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Instructions */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(10, 10, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .key {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin-right: 5px;
+        }
+
+        /* ==========================================
+           PHASE 2: SYSTEMS REALITY STYLES
+           ========================================== */
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .toggle-label {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #ff6b6b;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        /* MFU Gauge */
+        .mfu-gauge {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            padding: 15px 25px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .mfu-title {
+            font-size: 0.7rem;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mfu-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: monospace;
+            transition: color 0.3s;
+        }
+
+        .mfu-value.high { color: #4ecdc4; }
+        .mfu-value.medium { color: #ffe66d; }
+        .mfu-value.low { color: #ff6b6b; }
+
+        .mfu-bar {
+            width: 150px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .mfu-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s, background 0.3s;
+        }
+
+        /* Fake Console */
+        .fake-console {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            max-width: calc(100vw - 720px);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.7rem;
+            overflow: hidden;
+        }
+
+        .console-header {
+            background: rgba(0, 255, 136, 0.1);
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .console-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .console-body {
+            padding: 8px 12px;
+            max-height: 80px;
+            overflow-y: auto;
+            color: #888;
+        }
+
+        .console-line {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .console-line .rank { color: #00d4ff; }
+        .console-line .time { color: #ffe66d; }
+        .console-line .waiting { color: #ff6b6b; }
+        .console-line .synced { color: #4ecdc4; }
+
+        /* GPU Card States */
+        .gpu-card.waiting {
+            opacity: 0.4;
+            border-color: #666 !important;
+        }
+
+        .gpu-card.waiting .gpu-name::after {
+            content: ' (IDLE)';
+            color: #ff6b6b;
+            font-size: 0.65rem;
+        }
+
+        .gpu-card.straggler {
+            border-color: #ff6b6b !important;
+            animation: stragglerPulse 0.5s infinite;
+        }
+
+        @keyframes stragglerPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4); }
+            50% { box-shadow: 0 0 10px 2px rgba(255, 107, 107, 0.6); }
+        }
+
+        /* Interconnect indicator */
+        .interconnect-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 5px;
+            font-size: 0.7rem;
+        }
+
+        .interconnect-type {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .interconnect-type.nvlink {
+            background: rgba(78, 205, 196, 0.2);
+            color: #4ecdc4;
+        }
+
+        .interconnect-type.ethernet {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+        }
+
+        /* Convergence Box */
+        .convergence-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .convergence-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .target-value {
+            color: #ffe66d;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .convergence-progress {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .convergence-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff6b6b, #ffe66d, #4ecdc4);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .convergence-status {
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+        }
+
+        .convergence-status.converged {
+            color: #4ecdc4;
+            font-weight: bold;
+            animation: celebratePulse 0.5s ease 3;
+        }
+
+        .convergence-status.failed {
+            color: #ff6b6b;
+        }
+
+        @keyframes celebratePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <h1>LLM Training Simulator</h1>
+        <p class="subtitle">
+            Visualize distributed LLM training with NCCL gradient synchronization.
+            See how different models, optimizers, and clusters perform.
+        </p>
+
+        <!-- LLM Model Presets -->
+        <div class="section">
+            <h2>Model Presets</h2>
+            <div class="preset-buttons" id="preset-buttons">
+                <button class="preset-btn" data-preset="qwen">Qwen-2.5 72B</button>
+                <button class="preset-btn" data-preset="kimi">Kimi K2 1T</button>
+                <button class="preset-btn" data-preset="deepseek">DeepSeek V3</button>
+                <button class="preset-btn" data-preset="llama">Llama 3.1 405B</button>
+            </div>
+            
+            <!-- Model Card -->
+            <div class="model-card" id="model-card">
+                <div class="model-card-header">
+                    <span class="model-name" id="model-name">Custom Configuration</span>
+                    <span class="model-badge" id="model-badge">Dense</span>
+                </div>
+                <div class="model-stats">
+                    <div class="model-stat">
+                        <span class="stat-label">Params</span>
+                        <span class="stat-val" id="model-params">-</span>
+                    </div>
+                    <div class="model-stat">
+                        <span class="stat-label">Cluster</span>
+                        <span class="stat-val" id="model-cluster">4 Nodes</span>
+                    </div>
+                    <div class="model-stat">
+                        <span class="stat-label">Optimizer</span>
+                        <span class="stat-val" id="model-optimizer">Adam</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Configuration</h2>
+            <div class="control-group">
+                <label>Loss Landscape</label>
+                <select id="landscape-select">
+                    <option value="valley">Valley (x² + 4y²)</option>
+                    <option value="saddle">Saddle Point (x² - y²)</option>
+                    <option value="rosenbrock">Rosenbrock Banana</option>
+                    <option value="beale">Beale Function</option>
+                    <option value="rastrigin">Rastrigin (many minima)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Optimizer</label>
+                <select id="optimizer-select">
+                    <option value="sgd">SGD</option>
+                    <option value="momentum">SGD + Momentum</option>
+                    <option value="adam" selected>AdamW</option>
+                    <option value="muon">Muon (Kimi K2)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Training Mode</h2>
+            <div class="mode-toggle">
+                <div class="mode-btn active" id="mode-no-nccl">
+                    <span class="icon">🔀</span>
+                    No Sync
+                </div>
+                <div class="mode-btn" id="mode-with-nccl">
+                    <span class="icon">🔗</span>
+                    NCCL Sync
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Cluster Nodes</h2>
+            <div class="gpu-cards" id="gpu-cards-container">
+                <!-- Cards will be generated by JS -->
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="control-group">
+                <label>Batch Variance (data parallelism noise)</label>
+                <input type="range" id="noise" min="0" max="100" value="50">
+                <div class="value-display">σ = <span id="noise-val">0.5</span></div>
+            </div>
+
+            <div class="control-group">
+                <label>Learning Rate</label>
+                <input type="range" id="lr" min="1" max="100" value="30">
+                <div class="value-display">lr = <span id="lr-val">0.3</span></div>
+            </div>
+
+            <div class="control-group">
+                <label>Training Iterations</label>
+                <input type="range" id="steps" min="20" max="500" value="100">
+                <div class="value-display"><span id="steps-val">100</span></div>
+            </div>
+        </div>
+
+        <!-- System Simulation Section -->
+        <div class="section">
+            <h2>System Simulation</h2>
+            
+            <div class="toggle-container">
+                <span class="toggle-label">Straggler Node (Node 2)</span>
+                <div class="toggle-switch" id="straggler-toggle"></div>
+            </div>
+            
+            <div class="control-group" style="margin-top: 10px;">
+                <label>Inter-Node Interconnect</label>
+                <input type="range" id="bandwidth" min="1" max="100" value="100">
+                <div class="interconnect-indicator">
+                    <span class="interconnect-type" id="interconnect-type">NVLink 900GB/s</span>
+                    <span id="comm-latency-display" style="color: #666;">0ms sync</span>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" id="run-btn">▶ Start Training</button>
+        <button class="btn btn-secondary" id="reset-btn">↺ Reset</button>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="info-panel">
+        <h2 id="info-title">Training Status</h2>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="stat-step">0</div>
+                <div class="stat-label">Iteration</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-tokens">0</div>
+                <div class="stat-label">Tokens (B)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-time">0.0s</div>
+                <div class="stat-label">Wall Time</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="stat-best-loss">-</div>
+                <div class="stat-label">Loss</div>
+            </div>
+        </div>
+        
+        <!-- Convergence Target -->
+        <div class="convergence-box" id="convergence-box">
+            <div class="convergence-header">
+                <span>Target Loss:</span>
+                <span class="target-value" id="target-loss-value">0.50</span>
+            </div>
+            <div class="convergence-progress">
+                <div class="convergence-bar" id="convergence-bar"></div>
+            </div>
+            <div class="convergence-status" id="convergence-status">Waiting to start...</div>
+        </div>
+
+        <div id="explanation-container">
+            <p class="explanation" id="main-explanation">
+                <strong>NCCL</strong> synchronizes gradients across distributed nodes during LLM training.
+                Without sync, each node trains a different model!
+            </p>
+            
+            <p class="explanation" style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">
+                <strong>Visual Guide:</strong><br>
+                Each colored path = one compute node's model weights<br>
+                Cyan ring = NCCL AllReduce communication<br>
+                (Click surface to set starting point)
+            </p>
+
+            <div class="code-block" id="code-display">
+# Distributed Training with NCCL
+for step in range(max_iters):
+    # Each node processes different data
+    loss = model(local_batch)
+    loss.backward()
+    
+    # NCCL: Average gradients across all nodes
+    dist.all_reduce(grads, op=ReduceOp.AVG)
+    
+    optimizer.step()  # All nodes update identically
+            </div>
+        </div>
+    </div>
+
+    <!-- NCCL Status Overlay -->
+    <div class="nccl-overlay" id="nccl-overlay" style="display: none;">
+        <div class="nccl-animation">
+            <div class="nccl-dot"></div>
+            <span class="nccl-arrow">⟷</span>
+            <div class="nccl-dot"></div>
+        </div>
+        <div class="nccl-status" id="nccl-status">NCCL: AllReduce in progress...</div>
+    </div>
+
+
+
+    <!-- MFU Gauge (Cluster Efficiency) -->
+    <div class="mfu-gauge" id="mfu-gauge">
+        <div class="mfu-title">Cluster Efficiency (MFU)</div>
+        <div class="mfu-value high" id="mfu-value">100%</div>
+        <div class="mfu-bar">
+            <div class="mfu-bar-fill" id="mfu-bar-fill" style="width: 100%; background: #4ecdc4;"></div>
+        </div>
+    </div>
+
+    <!-- Fake Console (Training Logs) -->
+    <div class="fake-console" id="fake-console">
+        <div class="console-header">
+            <div class="console-dot"></div>
+            Training Logs
+        </div>
+        <div class="console-body" id="console-body">
+            <div class="console-line"><span class="synced">[System]</span> Waiting to start training...</div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+        <span class="key">Drag</span> Rotate
+        <span class="key">Scroll</span> Zoom
+        <span class="key">Space</span> Play/Pause
+    </div>
+
+    <!-- Three.js from CDN (same as working index3d.html) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const SURFACE_SIZE = 10;
+        const SURFACE_SEGMENTS = 60;
+        const NUM_NODES = 4;  // Number of compute nodes in the cluster
+        const NODE_COLORS = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xc44dff]; // Red, Teal, Yellow, Purple
+        
+        // ==========================================
+
+        // ==========================================
+        // LANDSCAPES
+        // ==========================================
+        const landscapes = {
+            valley: {
+                name: "Valley",
+                fn: (x, y) => x * x + 4 * y * y,
+                grad: (x, y) => [2 * x, 8 * y],
+                scale: 0.04,
+                range: { x: [-5, 5], y: [-5, 5] },
+                optimum: [0, 0],
+                targetLoss: 0.5  // Easy to reach
+            },
+            saddle: {
+                name: "Saddle Point",
+                fn: (x, y) => x * x - y * y,
+                grad: (x, y) => [2 * x, -2 * y],
+                scale: 0.08,
+                range: { x: [-3, 3], y: [-3, 3] },
+                optimum: [0, 0],
+                targetLoss: 0.5
+            },
+            rosenbrock: {
+                name: "Rosenbrock",
+                fn: (x, y) => Math.pow(1 - x, 2) + 100 * Math.pow(y - x * x, 2),
+                grad: (x, y) => [
+                    -2 * (1 - x) - 400 * x * (y - x * x),
+                    200 * (y - x * x)
+                ],
+                scale: 0.003,
+                range: { x: [-2, 2], y: [-1, 3] },
+                optimum: [1, 1],
+                targetLoss: 1.0  // Hard - the banana is tricky
+            },
+            beale: {
+                name: "Beale",
+                fn: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return a * a + b * b + c * c;
+                },
+                grad: (x, y) => {
+                    const a = 1.5 - x + x * y;
+                    const b = 2.25 - x + x * y * y;
+                    const c = 2.625 - x + x * y * y * y;
+                    return [
+                        2 * a * (-1 + y) + 2 * b * (-1 + y * y) + 2 * c * (-1 + y * y * y),
+                        2 * a * x + 2 * b * 2 * x * y + 2 * c * 3 * x * y * y
+                    ];
+                },
+                scale: 0.008,
+                range: { x: [-4, 4], y: [-4, 4] },
+                optimum: [3, 0.5],
+                targetLoss: 1.0
+            },
+            rastrigin: {
+                name: "Rastrigin",
+                fn: (x, y) => 20 + x * x - 10 * Math.cos(2 * Math.PI * x) + y * y - 10 * Math.cos(2 * Math.PI * y),
+                grad: (x, y) => [
+                    2 * x + 20 * Math.PI * Math.sin(2 * Math.PI * x),
+                    2 * y + 20 * Math.PI * Math.sin(2 * Math.PI * y)
+                ],
+                scale: 0.03,
+                range: { x: [-3, 3], y: [-3, 3] },
+                optimum: [0, 0],
+                targetLoss: 2.0  // Many local minima make this hard
+            }
+        };
+
+        // ==========================================
+        // OPTIMIZERS
+        // ==========================================
+        const optimizerConfigs = {
+            sgd: {
+                create: () => ({ name: 'sgd' }),
+                step: (state, grad, lr) => [-lr * grad[0], -lr * grad[1]]
+            },
+            momentum: {
+                create: () => ({ name: 'momentum', v: [0, 0] }),
+                step: (state, grad, lr) => {
+                    state.v[0] = 0.9 * state.v[0] + grad[0];
+                    state.v[1] = 0.9 * state.v[1] + grad[1];
+                    return [-lr * state.v[0], -lr * state.v[1]];
+                }
+            },
+            rmsprop: {
+                create: () => ({ name: 'rmsprop', v: [0, 0] }),
+                step: (state, grad, lr) => {
+                    state.v[0] = 0.99 * state.v[0] + 0.01 * grad[0] * grad[0];
+                    state.v[1] = 0.99 * state.v[1] + 0.01 * grad[1] * grad[1];
+                    return [
+                        -lr * grad[0] / (Math.sqrt(state.v[0]) + 1e-8),
+                        -lr * grad[1] / (Math.sqrt(state.v[1]) + 1e-8)
+                    ];
+                }
+            },
+            adam: {
+                create: () => ({ name: 'adam', m: [0, 0], v: [0, 0], t: 0 }),
+                step: (state, grad, lr) => {
+                    state.t++;
+                    const beta1 = 0.9, beta2 = 0.999;
+                    state.m[0] = beta1 * state.m[0] + (1 - beta1) * grad[0];
+                    state.m[1] = beta1 * state.m[1] + (1 - beta1) * grad[1];
+                    state.v[0] = beta2 * state.v[0] + (1 - beta2) * grad[0] * grad[0];
+                    state.v[1] = beta2 * state.v[1] + (1 - beta2) * grad[1] * grad[1];
+                    
+                    const mHat = [
+                        state.m[0] / (1 - Math.pow(beta1, state.t)),
+                        state.m[1] / (1 - Math.pow(beta1, state.t))
+                    ];
+                    const vHat = [
+                        state.v[0] / (1 - Math.pow(beta2, state.t)),
+                        state.v[1] / (1 - Math.pow(beta2, state.t))
+                    ];
+                    
+                    return [
+                        -lr * mHat[0] / (Math.sqrt(vHat[0]) + 1e-8),
+                        -lr * mHat[1] / (Math.sqrt(vHat[1]) + 1e-8)
+                    ];
+                }
+            },
+            // Muon optimizer (simplified) - used by Kimi K2
+            // Muon = Momentum + Orthogonalization (Nesterov-style)
+            muon: {
+                create: () => ({ name: 'muon', v: [0, 0], t: 0 }),
+                step: (state, grad, lr) => {
+                    state.t++;
+                    const mu = 0.95; // Nesterov momentum
+                    
+                    // Nesterov momentum update
+                    const v_old = [...state.v];
+                    state.v[0] = mu * state.v[0] + grad[0];
+                    state.v[1] = mu * state.v[1] + grad[1];
+                    
+                    // Nesterov lookahead
+                    const update = [
+                        mu * state.v[0] + grad[0],
+                        mu * state.v[1] + grad[1]
+                    ];
+                    
+                    // Simplified orthogonalization (normalize update direction)
+                    const norm = Math.sqrt(update[0]*update[0] + update[1]*update[1]) + 1e-8;
+                    const scale = Math.min(1.0, 1.0 / norm) * norm; // Clip large updates
+                    
+                    return [
+                        -lr * 1.5 * update[0] * scale / norm,  // 1.5x for Muon's faster convergence
+                        -lr * 1.5 * update[1] * scale / norm
+                    ];
+                }
+            }
+        };
+
+        // ==========================================
+        // LLM MODEL PRESETS
+        // ==========================================
+        const modelPresets = {
+            qwen: {
+                name: 'Qwen-2.5 72B',
+                params: '72B',
+                arch: 'Dense',
+                optimizer: 'adam',
+                cluster: '32x H100',
+                nodes: 4,
+                interconnect: 100,  // NVLink
+                straggler: false,
+                tokensPerStep: 0.5  // Billions of tokens per 1000 steps
+            },
+            kimi: {
+                name: 'Kimi K2 1T',
+                params: '1T MoE',
+                arch: 'MoE',
+                optimizer: 'muon',
+                cluster: '256x H100',
+                nodes: 4,
+                interconnect: 90,
+                straggler: false,
+                tokensPerStep: 2.0
+            },
+            deepseek: {
+                name: 'DeepSeek V3',
+                params: '671B MoE',
+                arch: 'MoE',
+                optimizer: 'adam',
+                cluster: '2048x H800',
+                nodes: 4,
+                interconnect: 60,  // Cross-datacenter
+                straggler: true,   // MoE load imbalance
+                tokensPerStep: 1.5
+            },
+            llama: {
+                name: 'Llama 3.1 405B',
+                params: '405B',
+                arch: 'Dense',
+                optimizer: 'adam',
+                cluster: '16K H100',
+                nodes: 4,
+                interconnect: 95,
+                straggler: false,
+                tokensPerStep: 3.0
+            }
+        };
+
+        let currentPreset = null;
+        let tokensProcessed = 0;
+
+        // ==========================================
+        // LLM PRESET FUNCTIONS
+        // ==========================================
+        function applyPreset(presetName) {
+            const preset = modelPresets[presetName];
+            if (!preset) return;
+            
+            currentPreset = presetName;
+            
+            // Update optimizer
+            currentOptimizer = preset.optimizer;
+            document.getElementById('optimizer-select').value = preset.optimizer;
+            
+            // Update interconnect
+            interconnectSpeed = preset.interconnect;
+            document.getElementById('bandwidth').value = interconnectSpeed;
+            commLatency = Math.round((100 - interconnectSpeed) * 2);
+            updateInterconnectDisplay();
+            
+            // Update straggler
+            simulateStraggler = preset.straggler;
+            document.getElementById('straggler-toggle').classList.toggle('active', simulateStraggler);
+            stragglerDelay = simulateStraggler ? 150 : 0;
+            
+            // Update target loss from current landscape (ensure it's set correctly)
+            const land = landscapes[currentLandscape];
+            targetLoss = land.targetLoss;
+            document.getElementById('target-loss-value').textContent = targetLoss.toFixed(2);
+            
+            // Update UI
+            updateModelCard(preset);
+            updatePresetButtons(presetName);
+            resetTraining();
+            
+            addConsoleLog(`<span class="synced">[Config] Loaded ${preset.name} configuration</span>`);
+        }
+
+        function updateModelCard(preset) {
+            document.getElementById('model-name').textContent = preset.name;
+            document.getElementById('model-params').textContent = preset.params;
+            document.getElementById('model-cluster').textContent = preset.cluster;
+            
+            // Display optimizer name nicely
+            const optimizerNames = {
+                'adam': 'AdamW',
+                'muon': 'Muon',
+                'sgd': 'SGD',
+                'momentum': 'Momentum'
+            };
+            document.getElementById('model-optimizer').textContent = optimizerNames[preset.optimizer] || preset.optimizer;
+            
+            const badge = document.getElementById('model-badge');
+            badge.textContent = preset.arch;
+            badge.className = 'model-badge' + (preset.arch === 'MoE' ? ' moe' : '');
+        }
+
+        function updatePresetButtons(activePreset) {
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                const presetName = btn.dataset.preset;
+                btn.classList.toggle('active', presetName === activePreset);
+            });
+        }
+
+        // ==========================================
+        // STATE
+        // ==========================================
+        let currentLandscape = 'valley';
+        let currentOptimizer = 'adam';
+        let useNCCL = false;
+        let noiseLevel = 0.5;
+        let learningRate = 0.04; 
+        let maxSteps = 100;
+        let currentStep = 0;
+        let isRunning = false;
+        let startPoint = [-3.5, 1.5]; // Default start point
+
+        // GPU states
+        let gpuStates = [];
+        
+        // ==========================================
+        // PHASE 2: SYSTEM SIMULATION STATE
+        // ==========================================
+        let simulateStraggler = false;  // Toggle: Rank 2 is slow
+        let interconnectSpeed = 100;     // 1-100 (100 = NVLink, 1 = slow Ethernet)
+        let commLatency = 0;             // Calculated from interconnectSpeed (ms)
+        let mfuValue = 100;              // Current MFU percentage
+        const COMPUTE_TIME = 30;         // Simulated compute time per step (ms)
+        let stragglerDelay = 0;          // Extra delay for straggler (ms)
+
+        // ==========================================
+        // CONVERGENCE TRACKING STATE
+        // ==========================================
+        let targetLoss = 0.5;            // Target loss threshold
+        let simulatedTime = 0;           // Total simulated wall-clock time (ms)
+        let hasConverged = false;        // Whether we've hit the target
+        let convergenceTime = null;      // Time when we converged (null if not yet)
+        let bestLoss = Infinity;         // Best loss achieved so far
+        let initialLoss = null;          // Loss at start (for progress calculation)
+
+        function generateNodeCards() {
+            const container = document.getElementById('gpu-cards-container');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < NUM_NODES; i++) {
+                const color = '#' + NODE_COLORS[i].toString(16).padStart(6, '0');
+                const rgba = `rgba(${parseInt(color.slice(1,3),16)}, ${parseInt(color.slice(3,5),16)}, ${parseInt(color.slice(5,7),16)}, 0.1)`;
+                
+                const card = document.createElement('div');
+                card.className = `gpu-card gpu${i}`;
+                card.innerHTML = `
+                    <div class="gpu-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="6" width="20" height="12" rx="2" fill="${rgba}"/>
+                            <rect x="5" y="9" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.4"/>
+                            <rect x="10" y="9" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.4"/>
+                            <rect x="15" y="9" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.4"/>
+                            <path d="M7 14v2M12 14v2M17 14v2"/>
+                        </svg>
+                    </div>
+                    <div class="gpu-info">
+                        <div class="gpu-name">Node ${i}</div>
+                        <div class="gpu-loss" id="loss-gpu${i}">-</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function initGPUStates() {
+            gpuStates = [];
+            const optConfig = optimizerConfigs[currentOptimizer];
+            for (let i = 0; i < NUM_NODES; i++) {
+                gpuStates.push({
+                    position: [...startPoint],
+                    path: [],
+                    optState: optConfig.create()
+                });
+            }
+            // Clear path line geometries if they exist
+            pathLines.forEach(line => {
+                if (line.geometry) {
+                    line.geometry.setFromPoints([]);
+                }
+            });
+        }
+
+        // Three.js objects
+        let scene, camera, renderer, controls;
+        let surfaceMesh;
+        let gpuMarkers = [];
+        let pathLines = [];
+        let connectionLine = null;
+
+        // ==========================================
+        // THREE.JS SETUP
+        // ==========================================
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a15);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(10, 10, 10);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0x404040, 0.6));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 5);
+            scene.add(dirLight);
+
+            // Grid
+            const grid = new THREE.GridHelper(10, 20, 0x333333, 0x222222);
+            grid.position.y = -0.01;
+            scene.add(grid);
+
+            generateNodeCards(); // Generate HTML for node cards
+            initGPUStates(); // Initialize GPU states before creating markers
+            createSurface();
+            createConnectionLine();  // Must be before createGPUMarkers (which calls updateGPUMarkers)
+            createGPUMarkers();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        }
+
+        function createSurface() {
+            if (surfaceMesh) {
+                scene.remove(surfaceMesh);
+                surfaceMesh.geometry.dispose();
+                surfaceMesh.material.dispose();
+            }
+
+            const land = landscapes[currentLandscape];
+            const geometry = new THREE.PlaneGeometry(SURFACE_SIZE, SURFACE_SIZE, SURFACE_SEGMENTS, SURFACE_SEGMENTS);
+            const positions = geometry.attributes.position.array;
+            const colors = new Float32Array(positions.length);
+
+            let minZ = Infinity, maxZ = -Infinity;
+
+            // Calculate heights
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = positions[i] / (SURFACE_SIZE / 2) * ((land.range.x[1] - land.range.x[0]) / 2);
+                const y = positions[i + 1] / (SURFACE_SIZE / 2) * ((land.range.y[1] - land.range.y[0]) / 2);
+                let z = land.fn(x, y) * land.scale;
+                z = Math.min(z, 10);
+                positions[i + 2] = z;
+                if (z < minZ) minZ = z;
+                if (z > maxZ) maxZ = z;
+            }
+
+            // Color gradient
+            for (let i = 0; i < positions.length; i += 3) {
+                const z = positions[i + 2];
+                const t = (z - minZ) / (maxZ - minZ + 0.001);
+                
+                let r, g, b;
+                if (t < 0.33) {
+                    r = 0.1; g = 0.3 + t * 2; b = 0.8;
+                } else if (t < 0.66) {
+                    r = (t - 0.33) * 3; g = 0.9; b = 0.3;
+                } else {
+                    r = 1; g = 1 - (t - 0.66) * 2; b = 0.1;
+                }
+                
+                colors[i] = r;
+                colors[i + 1] = g;
+                colors[i + 2] = b;
+            }
+
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.computeVertexNormals();
+            geometry.rotateX(-Math.PI / 2);
+
+            const material = new THREE.MeshPhongMaterial({
+                vertexColors: true,
+                side: THREE.DoubleSide,
+                shininess: 30,
+                transparent: true,
+                opacity: 0.85
+            });
+
+            surfaceMesh = new THREE.Mesh(geometry, material);
+            scene.add(surfaceMesh);
+        }
+
+        function startTraining() {
+            if (isRunning) {
+                isRunning = false;
+                document.getElementById('run-btn').textContent = '▶ Resume';
+                document.getElementById('nccl-overlay').style.display = 'none';
+                return;
+            }
+
+            if (currentStep === 0) {
+                initGPUStates();
+                // Add jitter
+                for (let i = 0; i < NUM_NODES; i++) {
+                    const jitterX = (Math.random() - 0.5) * 0.1;
+                    const jitterY = (Math.random() - 0.5) * 0.1;
+                    gpuStates[i].position = [startPoint[0] + jitterX, startPoint[1] + jitterY];
+                    gpuStates[i].path = [[...gpuStates[i].position]];
+                }
+                updateGPUMarkers();
+                updatePathLines();
+            }
+
+            isRunning = true;
+            document.getElementById('run-btn').textContent = '⏸ Pause';
+            
+            if (useNCCL) {
+                document.getElementById('nccl-overlay').style.display = 'flex';
+            }
+
+            trainingStep();
+        }
+
+        // Utility sleep function for async delays
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function trainingStep() {
+            if (!isRunning || currentStep >= maxSteps || hasConverged) {
+                isRunning = false;
+                document.getElementById('run-btn').textContent = '▶ Start Training';
+                document.getElementById('nccl-overlay').style.display = 'none';
+                updateGPUCardStates([], -1); // Clear states
+                if (hasConverged) {
+                    addConsoleLog(`<span class="synced">[SUCCESS] Target loss reached in ${formatTime(convergenceTime)}!</span>`);
+                } else if (currentStep >= maxSteps) {
+                    addConsoleLog('<span class="waiting">[Timeout] Max steps reached without converging</span>');
+                    document.getElementById('convergence-status').textContent = 'Failed to converge';
+                    document.getElementById('convergence-status').className = 'convergence-status failed';
+                }
+                return;
+            }
+
+            currentStep++;
+            let stepWaitTime = 0;
+
+            // Log step start (less verbose - only every 10 steps)
+            if (currentStep % 10 === 1 || currentStep === 1) {
+                addConsoleLog(`<span class="rank">[Step ${currentStep}]</span> Training...`);
+            }
+
+            // Compute gradients for each GPU
+            const grads = [];
+            for (let i = 0; i < NUM_NODES; i++) {
+                const pos = gpuStates[i].position;
+                grads.push(computeGradient(pos[0], pos[1], i));
+            }
+
+            // Simulate straggler: Rank 2 takes longer, others wait
+            if (useNCCL && simulateStraggler) {
+                // Mark ranks 0,1,3 as waiting for rank 2
+                updateGPUCardStates([0, 1, 3], 2);
+                if (currentStep % 20 === 1) {
+                    addConsoleLog('<span class="waiting">[Straggler] Rank 2 lagging...</span>');
+                }
+                
+                await sleep(stragglerDelay);
+                stepWaitTime += stragglerDelay;
+            }
+
+            // Apply NCCL: average gradients if enabled
+            if (useNCCL) {
+                // Simulate communication latency
+                if (commLatency > 0) {
+                    document.getElementById('nccl-status').textContent = `NCCL: Ring AllReduce... (${commLatency}ms)`;
+                    
+                    await sleep(commLatency);
+                    stepWaitTime += commLatency;
+                }
+                
+                // Average gradients
+                let avgX = 0, avgY = 0;
+                for (let i = 0; i < NUM_NODES; i++) {
+                    avgX += grads[i][0];
+                    avgY += grads[i][1];
+                }
+                avgX /= NUM_NODES;
+                avgY /= NUM_NODES;
+                
+                // Distribute averaged gradient back to all GPUs
+                for (let i = 0; i < NUM_NODES; i++) {
+                    grads[i] = [avgX, avgY];
+                }
+                
+                document.getElementById('nccl-status').textContent = 'NCCL: Gradients synchronized';
+                updateGPUCardStates([], -1); // Clear waiting states
+            }
+
+            // Apply optimizer update for each GPU
+            const optConfig = optimizerConfigs[currentOptimizer];
+            for (let i = 0; i < NUM_NODES; i++) {
+                const delta = optConfig.step(gpuStates[i].optState, grads[i], learningRate);
+                gpuStates[i].position[0] += delta[0];
+                gpuStates[i].position[1] += delta[1];
+                
+                // Clamp to landscape bounds
+                const land = landscapes[currentLandscape];
+                gpuStates[i].position[0] = Math.max(land.range.x[0], Math.min(land.range.x[1], gpuStates[i].position[0]));
+                gpuStates[i].position[1] = Math.max(land.range.y[0], Math.min(land.range.y[1], gpuStates[i].position[1]));
+                
+                // Record path
+                gpuStates[i].path.push([...gpuStates[i].position]);
+            }
+
+            // Update simulated wall-clock time
+            // Each step = COMPUTE_TIME + any wait time (straggler + comm latency)
+            const stepSimulatedTime = COMPUTE_TIME + stepWaitTime;
+            simulatedTime += stepSimulatedTime;
+
+            // Calculate and update MFU based on actual timing
+            mfuValue = Math.round((COMPUTE_TIME / stepSimulatedTime) * 100);
+            updateMFU();
+
+            // Check for convergence
+            const land = landscapes[currentLandscape];
+            let currentBestLoss = Infinity;
+            
+            if (useNCCL) {
+                // With NCCL: all GPUs have same position, check the unified model
+                const pos = gpuStates[0].position;
+                currentBestLoss = land.fn(pos[0], pos[1]);
+            } else {
+                // Without NCCL: check if ANY GPU reached target (best of diverged models)
+                for (let i = 0; i < NUM_NODES; i++) {
+                    const pos = gpuStates[i].position;
+                    const loss = land.fn(pos[0], pos[1]);
+                    if (loss < currentBestLoss) {
+                        currentBestLoss = loss;
+                    }
+                }
+            }
+            
+            if (currentBestLoss < bestLoss) {
+                bestLoss = currentBestLoss;
+            }
+            
+            // Store initial loss for progress calculation
+            if (initialLoss === null) {
+                initialLoss = currentBestLoss;
+            }
+
+            // Check if we've hit the target
+            if (bestLoss <= targetLoss && !hasConverged) {
+                hasConverged = true;
+                convergenceTime = simulatedTime;
+                addConsoleLog(`<span class="synced">[CONVERGED] Target loss ${targetLoss} reached in ${formatTime(convergenceTime)}!</span>`);
+            }
+
+            updateGPUMarkers();
+            updatePathLines();
+            updateStats();
+            updateConvergenceProgress();
+
+            // Schedule next step (visual delay for smooth animation)
+            const visualDelay = 150; // 150ms per step for easy viewing
+            setTimeout(trainingStep, visualDelay);
+        }
+
+        function updateStats() {
+            document.getElementById('stat-step').textContent = currentStep;
+            document.getElementById('stat-time').textContent = formatTime(simulatedTime);
+            
+            // Update tokens processed (based on model preset)
+            if (currentStep > 0 && currentPreset) {
+                tokensProcessed += modelPresets[currentPreset].tokensPerStep / 100; // Per step increment
+            }
+            document.getElementById('stat-tokens').textContent = tokensProcessed.toFixed(1);
+            
+            // Update best loss display
+            const bestLossEl = document.getElementById('stat-best-loss');
+            if (bestLoss === Infinity) {
+                bestLossEl.textContent = '-';
+                bestLossEl.className = 'stat-value';
+            } else {
+                bestLossEl.textContent = bestLoss.toFixed(3);
+                if (bestLoss <= targetLoss) {
+                    bestLossEl.className = 'stat-value good';
+                } else {
+                    bestLossEl.className = 'stat-value';
+                }
+            }
+        }
+
+        // Format milliseconds to readable time string
+        function formatTime(ms) {
+            if (ms < 1000) {
+                return ms + 'ms';
+            } else if (ms < 60000) {
+                return (ms / 1000).toFixed(1) + 's';
+            } else {
+                const mins = Math.floor(ms / 60000);
+                const secs = ((ms % 60000) / 1000).toFixed(0);
+                return `${mins}m ${secs}s`;
+            }
+        }
+
+        // Update convergence progress bar and status
+        function updateConvergenceProgress() {
+            const statusEl = document.getElementById('convergence-status');
+            const barEl = document.getElementById('convergence-bar');
+            
+            if (hasConverged) {
+                barEl.style.width = '100%';
+                statusEl.textContent = `Converged in ${formatTime(convergenceTime)} (${currentStep} steps)`;
+                statusEl.className = 'convergence-status converged';
+            } else if (initialLoss !== null) {
+                // Calculate progress as percentage from initial to target
+                // Handle edge case where initialLoss <= targetLoss (already at target)
+                if (initialLoss <= targetLoss) {
+                    barEl.style.width = '100%';
+                    statusEl.textContent = `Already at target! Loss: ${bestLoss.toFixed(3)}`;
+                    statusEl.className = 'convergence-status converged';
+                } else {
+                    const progress = Math.min(100, Math.max(0, 
+                        ((initialLoss - bestLoss) / (initialLoss - targetLoss)) * 100
+                    ));
+                    barEl.style.width = progress + '%';
+                    statusEl.textContent = `Progress: ${progress.toFixed(0)}% | Time: ${formatTime(simulatedTime)}`;
+                    statusEl.className = 'convergence-status';
+                }
+            } else {
+                barEl.style.width = '0%';
+                statusEl.textContent = 'Training...';
+                statusEl.className = 'convergence-status';
+            }
+        }
+
+
+
+
+
+        function resetTraining() {
+            isRunning = false;
+            currentStep = 0;
+            
+            // Reset convergence tracking
+            simulatedTime = 0;
+            hasConverged = false;
+            convergenceTime = null;
+            bestLoss = Infinity;
+            initialLoss = null;
+            tokensProcessed = 0;
+            
+            initGPUStates();
+            updateGPUMarkers();
+            updatePathLines();
+            updateGPUCardStates([], -1);
+            document.getElementById('run-btn').textContent = '▶ Start Training';
+            document.getElementById('nccl-overlay').style.display = 'none';
+            updateStats();
+            updateMFU();
+            updateConvergenceProgress();
+            
+            // Reset convergence UI
+            document.getElementById('convergence-bar').style.width = '0%';
+            document.getElementById('convergence-status').textContent = 'Waiting to start...';
+            document.getElementById('convergence-status').className = 'convergence-status';
+            
+            addConsoleLog('<span class="synced">[System] Training reset. Ready to start.</span>');
+        }
+
+        // ==========================================
+        // UI EVENT HANDLERS
+        // ==========================================
+        document.getElementById('landscape-select').addEventListener('change', (e) => {
+            currentLandscape = e.target.value;
+            currentPreset = null;  // Clear preset when manually changing
+            updatePresetButtons(null);  // Deselect all preset buttons
+            createSurface();
+            // Reset start point to a reasonable default for this landscape
+            const land = landscapes[currentLandscape];
+            startPoint = [
+                land.range.x[0] * 0.7 + land.range.x[1] * 0.3, 
+                land.range.y[0] * 0.3 + land.range.y[1] * 0.7
+            ];
+            // Update target loss for this landscape
+            targetLoss = land.targetLoss;
+            document.getElementById('target-loss-value').textContent = targetLoss.toFixed(2);
+            resetTraining();
+        });
+
+        document.getElementById('optimizer-select').addEventListener('change', (e) => {
+            currentOptimizer = e.target.value;
+            currentPreset = null;  // Clear preset when manually changing
+            updatePresetButtons(null);  // Deselect all preset buttons
+            resetTraining();
+        });
+
+        document.getElementById('mode-no-nccl').addEventListener('click', () => {
+            useNCCL = false;
+            document.getElementById('mode-no-nccl').classList.add('active');
+            document.getElementById('mode-with-nccl').classList.remove('active');
+            document.getElementById('nccl-overlay').style.display = 'none';
+            
+            document.getElementById('info-title').textContent = 'Without NCCL: Model Divergence';
+            document.getElementById('code-display').textContent = `# Without NCCL - Training Diverges!
+# Each GPU trains on a DIFFERENT batch of data.
+# Different Batch = Different Gradient Direction (Variance).
+
+for step in range(steps):
+    for gpu in gpus:
+        # GPU sees unique batch (Noise!)
+        batch = gpu.get_local_batch()
+        grad = compute_gradient(model, batch)
+        
+        # Updates point in different directions
+        gpu.weights -= lr * grad 
+        
+# Result: Models drift apart randomly!`;
+            
+            resetTraining();
+        });
+
+        document.getElementById('mode-with-nccl').addEventListener('click', () => {
+            useNCCL = true;
+            document.getElementById('mode-with-nccl').classList.add('active');
+            document.getElementById('mode-no-nccl').classList.remove('active');
+            
+            document.getElementById('info-title').textContent = 'With NCCL: Synchronized Training';
+            document.getElementById('code-display').textContent = `# With NCCL - Gradients are synchronized
+for step in range(steps):
+    grads = []
+    for gpu in gpus:
+        batch = gpu.get_local_batch()
+        grad = compute_gradient(model, batch)
+        grads.append(grad)
+    
+    # NCCL AllReduce: Average gradients across GPUs
+    avg_grad = nccl.all_reduce(grads) / n_gpus
+    
+    for gpu in gpus:
+        gpu.weights -= lr * avg_grad  # Same update!
+
+# Result: All GPUs have identical weights!`;
+            
+            resetTraining();
+        });
+
+        document.getElementById('noise').addEventListener('input', (e) => {
+            noiseLevel = parseInt(e.target.value) / 100;
+            document.getElementById('noise-val').textContent = noiseLevel.toFixed(2);
+        });
+
+        document.getElementById('lr').addEventListener('input', (e) => {
+            learningRate = parseInt(e.target.value) / 100;
+            document.getElementById('lr-val').textContent = learningRate.toFixed(2);
+        });
+
+        document.getElementById('steps').addEventListener('input', (e) => {
+            maxSteps = parseInt(e.target.value);
+            document.getElementById('steps-val').textContent = maxSteps;
+        });
+
+        document.getElementById('run-btn').addEventListener('click', startTraining);
+        document.getElementById('reset-btn').addEventListener('click', resetTraining);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                startTraining();
+            }
+        });
+
+        // ==========================================
+        // PHASE 2: SYSTEM SIMULATION EVENT HANDLERS
+        // ==========================================
+        
+        // LLM Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const presetName = this.dataset.preset;
+                applyPreset(presetName);
+            });
+        });
+        
+        // Straggler toggle
+        document.getElementById('straggler-toggle').addEventListener('click', function() {
+            simulateStraggler = !simulateStraggler;
+            this.classList.toggle('active', simulateStraggler);
+            stragglerDelay = simulateStraggler ? 150 : 0; // 150ms extra delay for straggler
+            addConsoleLog(simulateStraggler ? 
+                '<span class="waiting">[ALERT] Rank 2 experiencing thermal throttling!</span>' :
+                '<span class="synced">[System] All ranks operating normally</span>');
+            updateMFU();
+        });
+
+        // Bandwidth slider
+        document.getElementById('bandwidth').addEventListener('input', (e) => {
+            interconnectSpeed = parseInt(e.target.value);
+            // Map 1-100 to latency: 100 = 0ms (NVLink), 1 = 200ms (slow Ethernet)
+            commLatency = Math.round((100 - interconnectSpeed) * 2);
+            updateInterconnectDisplay();
+            updateMFU();
+        });
+
+        function updateInterconnectDisplay() {
+            const typeEl = document.getElementById('interconnect-type');
+            const latencyEl = document.getElementById('comm-latency-display');
+            
+            if (interconnectSpeed >= 80) {
+                typeEl.textContent = 'NVLink 900GB/s';
+                typeEl.className = 'interconnect-type nvlink';
+            } else if (interconnectSpeed >= 50) {
+                typeEl.textContent = 'InfiniBand 200GB/s';
+                typeEl.className = 'interconnect-type nvlink';
+            } else if (interconnectSpeed >= 20) {
+                typeEl.textContent = '100GbE';
+                typeEl.className = 'interconnect-type ethernet';
+            } else {
+                typeEl.textContent = '10GbE Ethernet';
+                typeEl.className = 'interconnect-type ethernet';
+            }
+            
+            latencyEl.textContent = commLatency > 0 ? `${commLatency}ms sync` : '~0ms sync';
+        }
+
+        // Update MFU gauge display
+        function updateMFU() {
+            const mfuEl = document.getElementById('mfu-value');
+            const mfuBarFill = document.getElementById('mfu-bar-fill');
+            
+            // Calculate theoretical MFU based on settings (when not running)
+            if (!isRunning) {
+                const theoreticalWait = (useNCCL ? commLatency : 0) + (simulateStraggler && useNCCL ? stragglerDelay : 0);
+                mfuValue = Math.round((COMPUTE_TIME / (COMPUTE_TIME + theoreticalWait)) * 100);
+            }
+            
+            mfuEl.textContent = mfuValue + '%';
+            mfuBarFill.style.width = mfuValue + '%';
+            
+            // Color based on efficiency
+            if (mfuValue >= 70) {
+                mfuEl.className = 'mfu-value high';
+                mfuBarFill.style.background = '#4ecdc4';
+            } else if (mfuValue >= 40) {
+                mfuEl.className = 'mfu-value medium';
+                mfuBarFill.style.background = '#ffe66d';
+            } else {
+                mfuEl.className = 'mfu-value low';
+                mfuBarFill.style.background = '#ff6b6b';
+            }
+        }
+
+        // Add a log line to the fake console
+        function addConsoleLog(message) {
+            const consoleBody = document.getElementById('console-body');
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            
+            line.innerHTML = `<span class="time">[${timestamp}]</span> ${message}`;
+            consoleBody.appendChild(line);
+            
+            // Keep only last 50 lines
+            while (consoleBody.children.length > 50) {
+                consoleBody.removeChild(consoleBody.firstChild);
+            }
+            
+            // Auto-scroll to bottom
+            consoleBody.scrollTop = consoleBody.scrollHeight;
+        }
+
+        // Update GPU card visual states (waiting/straggler)
+        function updateGPUCardStates(waitingRanks, stragglerRank) {
+            const cards = document.querySelectorAll('.gpu-card');
+            cards.forEach((card, i) => {
+                card.classList.remove('waiting', 'straggler');
+                
+                if (waitingRanks.includes(i)) {
+                    card.classList.add('waiting');
+                }
+                if (i === stragglerRank) {
+                    card.classList.add('straggler');
+                }
+            });
+        }
+
+        // ==========================================
+        // RENDER LOOP
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ==========================================
+        // GPU MARKERS AND PATHS
+        // ==========================================
+        function createConnectionLine() {
+            const material = new THREE.LineDashedMaterial({
+                color: 0x00d4ff,
+                dashSize: 0.2,
+                gapSize: 0.1,
+                linewidth: 2
+            });
+            // BufferGeometry for a closed loop of N GPUs needs N+1 points
+            const geometry = new THREE.BufferGeometry();
+            connectionLine = new THREE.Line(geometry, material);
+            connectionLine.visible = false;
+            scene.add(connectionLine);
+        }
+
+        function createGPUMarkers() {
+            // Clear existing markers
+            gpuMarkers.forEach(m => scene.remove(m));
+            pathLines.forEach(l => scene.remove(l));
+            gpuMarkers = [];
+            pathLines = [];
+
+            for (let i = 0; i < NUM_NODES; i++) {
+                // Create sphere marker for each GPU
+                const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+                const material = new THREE.MeshPhongMaterial({
+                    color: NODE_COLORS[i],
+                    emissive: NODE_COLORS[i],
+                    emissiveIntensity: 0.3
+                });
+                const marker = new THREE.Mesh(geometry, material);
+                scene.add(marker);
+                gpuMarkers.push(marker);
+
+                // Create path line for each GPU
+                const lineMaterial = new THREE.LineBasicMaterial({
+                    color: NODE_COLORS[i],
+                    linewidth: 2
+                });
+                const lineGeometry = new THREE.BufferGeometry();
+                const line = new THREE.Line(lineGeometry, lineMaterial);
+                scene.add(line);
+                pathLines.push(line);
+            }
+
+            updateGPUMarkers();
+        }
+
+        function worldToThree(x, y) {
+            const land = landscapes[currentLandscape];
+            const threeX = (x / ((land.range.x[1] - land.range.x[0]) / 2)) * (SURFACE_SIZE / 2);
+            const threeZ = (y / ((land.range.y[1] - land.range.y[0]) / 2)) * (SURFACE_SIZE / 2);
+            const z = land.fn(x, y) * land.scale;
+            return { x: threeX, y: Math.min(z, 10) + 0.15, z: threeZ };
+        }
+
+        function updateGPUMarkers() {
+            for (let i = 0; i < NUM_NODES; i++) {
+                const pos = gpuStates[i].position;
+                const threePos = worldToThree(pos[0], pos[1]);
+                gpuMarkers[i].position.set(threePos.x, threePos.y, threePos.z);
+            }
+
+            // Update Ring connection between GPUs (AllReduce topology)
+            if (connectionLine) {
+                const points = [];
+                for (let i = 0; i < NUM_NODES; i++) {
+                    const pos = gpuMarkers[i].position;
+                    points.push(new THREE.Vector3(pos.x, pos.y, pos.z));
+                }
+                // Close the loop
+                const first = gpuMarkers[0].position;
+                points.push(new THREE.Vector3(first.x, first.y, first.z));
+                
+                connectionLine.geometry.setFromPoints(points);
+                connectionLine.computeLineDistances();
+                connectionLine.visible = useNCCL && isRunning;
+            }
+
+            // Update loss display
+            const land = landscapes[currentLandscape];
+            for (let i = 0; i < NUM_NODES; i++) {
+                const pos = gpuStates[i].position;
+                const loss = land.fn(pos[0], pos[1]);
+                // Format nicely like "2.314" or "1.2e-4"
+                let lossStr = loss.toFixed(4);
+                if (loss > 1000) lossStr = loss.toExponential(2);
+                document.getElementById(`loss-gpu${i}`).textContent = lossStr;
+            }
+        }
+
+        function updatePathLines() {
+            for (let i = 0; i < NUM_NODES; i++) {
+                const path = gpuStates[i].path;
+                if (path.length < 2) continue;
+
+                const points = path.map(p => {
+                    const tp = worldToThree(p[0], p[1]);
+                    return new THREE.Vector3(tp.x, tp.y, tp.z);
+                });
+                pathLines[i].geometry.setFromPoints(points);
+            }
+        }
+
+        // ==========================================
+        // TRAINING LOGIC
+        // ==========================================
+        function computeGradient(x, y, gpuIndex) {
+            const land = landscapes[currentLandscape];
+            const grad = land.grad(x, y);
+            
+            // Calculate gradient magnitude (L2 norm)
+            const gradNorm = Math.sqrt(grad[0]*grad[0] + grad[1]*grad[1]);
+            
+            // "Real" Distributed Training Simulation:
+            // In Data Parallel training, each GPU computes gradients on a DIFFERENT batch of data.
+            // This introduces "Batch Noise" or variance.
+            // The noise is often proportional to the gradient magnitude (Signal-to-Noise Ratio).
+            
+            // We generate a random noise vector for this specific step and GPU
+            // using a crude pseudo-random generator based on step+gpu to make it deterministic per step 
+            // (so if you pause/resume it behaves consistently) but random over time.
+            
+            // Seeded random for consistency
+            const seed = currentStep * 10 + gpuIndex * 1000;
+            const r1 = Math.sin(seed) * 10000 - Math.floor(Math.sin(seed) * 10000); // 0..1
+            const r2 = Math.cos(seed) * 10000 - Math.floor(Math.cos(seed) * 10000); // 0..1
+            
+            // Noise vector (centered around 0)
+            const noiseDir = [(r1 - 0.5) * 2, (r2 - 0.5) * 2];
+            
+            // Apply noise PROPORTIONAL to the gradient magnitude
+            // This ensures visible divergence even in steep landscapes (like Beale)
+            // We add a small base constant (0.1) so they still diverge in flat areas
+            const noiseScale = noiseLevel * (gradNorm + 0.5); 
+            
+            return [
+                grad[0] + noiseDir[0] * noiseScale,
+                grad[1] + noiseDir[1] * noiseScale
+            ];
+        }
+
+
+
+        // ==========================================
+        // RAYCASTER FOR CLICK TO SET START POINT
+        // ==========================================
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('click', (event) => {
+                if (isRunning) return;
+                
+                // Calculate mouse position in normalized device coordinates
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Intersect with surface
+                const intersects = raycaster.intersectObject(surfaceMesh);
+                
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    // Convert Three.js coords back to world coords
+                    const worldX = point.x / (SURFACE_SIZE / 2) * 5;
+                    const worldY = point.z / (SURFACE_SIZE / 2) * 5;
+                    
+                    // Update the global startPoint
+                    startPoint = [worldX, worldY];
+
+                    // Reset both GPUs to this starting point
+                    for (let i = 0; i < NUM_NODES; i++) {
+                        gpuStates[i].position = [...startPoint];
+                        gpuStates[i].path = [];
+                        if (gpuStates[i].velocity) gpuStates[i].velocity = [0, 0];
+                        // Also reset optimizer state
+                        const optConfig = optimizerConfigs[currentOptimizer];
+                        gpuStates[i].optState = optConfig.create();
+                        
+                        pathLines[i].geometry.setFromPoints([]);
+                    }
+                    currentStep = 0;
+                    updateGPUMarkers();
+                    updateStats();
+                    
+                    console.log(`Start point set to: (${worldX.toFixed(2)}, ${worldY.toFixed(2)})`);
+                }
+            });
+        }
+
+        // ==========================================
+        // INIT
+        // ==========================================
+        try {
+            initThree();
+            setupRaycaster();
+            updateStats();
+        } catch (e) {
+            console.error('Three.js init failed:', e);
+            document.getElementById('canvas-container').innerHTML = 
+                '<div style="color:#ff6b6b;padding:50px;text-align:center;font-size:1.2rem;">' +
+                'WebGL Error: ' + e.message + '<br><br>' +
+                'Try refreshing the page or use Chrome/Firefox.' +
+                '</div>';
+        }
+    </script>
+</body>
+</html>

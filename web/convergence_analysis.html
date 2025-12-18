@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimization Algorithms Visualization (Python Backend)</title>
+    <!-- Import Inter Font for that clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* --- NOTION-STYLE POLISH --- */
+        :root {
+            --bg-body: #FFFFFF;
+            --bg-panel: #F7F7F5; /* Notion Sidebar Gray */
+            --border-color: #E9E9E7;
+            --text-main: #37352F;
+            --text-muted: #9B9A97;
+            --primary: #2383E2;
+            --primary-hover: #1D6ED0;
+            --danger: #EB5757;
+            --success: #27AE60;
+            --radius: 6px;
+            --shadow-subtle: 0 1px 2px rgba(15, 15, 15, 0.05);
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: var(--bg-body); 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        #container { display: grid; grid-template-columns: 320px 1fr 320px; height: 100vh; }
+        
+        /* Panels */
+        .panel { 
+            background: var(--bg-panel); 
+            border-right: 1px solid var(--border-color); 
+            padding: 24px; 
+            overflow-y: auto;
+            display: flex; flex-direction: column; gap: 20px;
+            z-index: 10;
+        }
+        .panel-right { 
+            border-right: none; 
+            border-left: 1px solid var(--border-color); 
+        }
+        
+        /* Canvas */
+        #canvas-container { 
+            position: relative; 
+            background: #FFFFFF;
+        }
+        
+        /* Typography */
+        h2 { 
+            font-size: 14px; 
+            font-weight: 600; 
+            margin: 0 0 12px 0; 
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px; 
+        }
+        h3 { 
+            font-size: 14px; 
+            margin: 0 0 8px 0; 
+            color: var(--text-main); 
+            font-weight: 600; 
+        }
+        
+        /* Controls */
+        .control-group { 
+            margin-bottom: 4px;
+        }
+        label { 
+            display: block; 
+            font-size: 12px; 
+            font-weight: 500; 
+            color: var(--text-muted); 
+            margin-bottom: 6px; 
+        }
+        
+        select, input[type="range"] { 
+            width: 100%; 
+            background: #FFFFFF; 
+            border: 1px solid rgba(55, 53, 47, 0.16); 
+            color: var(--text-main); 
+            padding: 8px 10px; 
+            border-radius: 4px; 
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-subtle);
+        }
+        select:hover { border-color: rgba(55, 53, 47, 0.3); }
+        select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.2); }
+        
+        /* Buttons */
+        .btn { 
+            width: 100%; 
+            padding: 10px 12px; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 14px; 
+            font-weight: 500; 
+            cursor: pointer; 
+            transition: all 0.1s ease; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-primary { 
+            background: var(--primary); 
+            color: white; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+        
+        .btn-secondary { 
+            background: white; 
+            color: var(--text-main); 
+            border: 1px solid rgba(55, 53, 47, 0.16);
+            margin-top: 8px;
+            box-shadow: var(--shadow-subtle);
+        }
+        .btn-secondary:hover { background: #F7F7F5; }
+        
+        /* Metric Cards */
+        .metric-card { 
+            background: #FFFFFF; 
+            padding: 16px; 
+            border-radius: 6px; 
+            border: 1px solid var(--border-color); 
+            box-shadow: var(--shadow-subtle);
+            margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        /* Colored accent line on left */
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--primary);
+        }
+        
+        .metric-label { 
+            font-size: 11px; 
+            font-weight: 600;
+            color: var(--text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .metric-value { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 18px; 
+            color: var(--text-main); 
+            font-weight: 500; 
+        }
+        
+        /* Table */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 13px; 
+            margin-top: 12px; 
+            background: transparent; 
+        }
+        th { 
+            text-align: left; 
+            font-weight: 500; 
+            color: var(--text-muted); 
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 4px;
+            font-size: 12px;
+        }
+        td { 
+            padding: 8px 4px; 
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace; 
+            color: var(--text-main);
+        }
+        
+        /* Badge & Footer Polish */
+        .backend-badge { 
+            background: rgba(35, 131, 226, 0.1); 
+            color: var(--primary); 
+            padding: 6px 10px; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 6px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(35, 131, 226, 0.2);
+            width: fit-content;
+        }
+        .backend-badge svg { width: 14px; height: 14px; fill: currentColor; }
+        
+        .footer-info {
+            margin-top: auto; 
+            padding-top: 24px; 
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .tech-stack {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tech-label { font-weight: 600; color: #37352F; }
+
+        /* Loading */
+        #loading-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.9); 
+            display: none; 
+            justify-content: center; align-items: center; 
+            z-index: 100; 
+            backdrop-filter: blur(4px); 
+        }
+        .spinner { 
+            border: 3px solid rgba(35, 131, 226, 0.1); 
+            border-top: 3px solid var(--primary); 
+            border-radius: 50%; 
+            width: 24px; height: 24px; 
+            animation: spin 0.8s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+<div id="container">
+    <div class="panel">
+        <div>
+            <h2>Configuration</h2>
+        </div>
+        
+        <div class="control-group">
+            <label>Objective Function</label>
+            <select id="landscapeSelect" onchange="app.changeLandscape()">
+                <option value="Matyas">Matyas (Quadratic, Convex)</option>
+                <option value="Himmelblau">Himmelblau (Non-Convex)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Primary Agent (Green)</label>
+            <select id="algoSelect1">
+                <option value="CG_PR">Conjugate Gradient (PR)</option>
+                <option value="BFGS">BFGS (Quasi-Newton)</option>
+                <option value="GD">Gradient Descent</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Comparison Agent (Red)</label>
+            <select id="algoSelect2">
+                <option value="GD">Gradient Descent (Fixed Step)</option>
+                <option value="CG_PR">Conjugate Gradient (PR)</option>
+                <option value="None">None (Hide)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Start Position</label>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <div style="flex:1;">
+                    <label style="font-size:10px; margin-bottom:2px;">X</label>
+                    <input type="number" id="startX" value="8" step="0.5" style="width:100%; padding:6px 8px; font-size:13px; font-family:'JetBrains Mono',monospace;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:10px; margin-bottom:2px;">Y</label>
+                    <input type="number" id="startY" value="8" step="0.5" style="width:100%; padding:6px 8px; font-size:13px; font-family:'JetBrains Mono',monospace;">
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="clickToSetBtn" onclick="app.toggleClickToSet()" style="margin-top:0; font-size:12px;">
+                Click on Surface to Set Start
+            </button>
+        </div>
+
+        <div class="control-group">
+            <label>Learning Rate <span id="lrDisplay" style="color:var(--text-muted); font-weight:normal;">0.05</span></label>
+            <input type="range" id="lrSlider" min="0.001" max="0.2" step="0.001" value="0.05" oninput="document.getElementById('lrDisplay').innerText = this.value">
+            
+            <label style="margin-top:16px;">Animation Speed</label>
+            <input type="range" id="speedSlider" min="1" max="60" step="1" value="20">
+        </div>
+
+        <details style="margin-bottom:12px;">
+            <summary style="cursor:pointer; font-size:12px; font-weight:600; color:var(--text-muted); padding:8px 0;">
+                Advanced: SPD Validation
+            </summary>
+            <div style="padding:12px; background:#fff; border:1px solid var(--border-color); border-radius:4px; margin-top:8px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                    <input type="checkbox" id="validatePD" style="width:auto;">
+                    <label for="validatePD" style="margin:0; font-size:12px;">Enable SPD validation</label>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                    <input type="checkbox" id="forceRun" style="width:auto;">
+                    <label for="forceRun" style="margin:0; font-size:12px;">Force run (ignore errors)</label>
+                </div>
+                <label style="font-size:11px;">Matrix A (2x2 for quadratic f(x)=x'Ax-b'x)</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">
+                    <input type="number" id="matA00" value="2" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA01" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA10" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="matA11" value="2" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                </div>
+                <label style="font-size:11px;">Vector b</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                    <input type="number" id="vecB0" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                    <input type="number" id="vecB1" value="0" step="0.1" style="padding:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">
+                </div>
+            </div>
+        </details>
+
+        <div style="margin-top:8px;">
+            <button class="btn btn-primary" onclick="app.runSimulation()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Run Simulation
+            </button>
+            <button class="btn btn-secondary" onclick="app.reset()">
+                Reset Positions
+            </button>
+        </div>
+
+        <div style="margin-top:auto;">
+            <h3>Results</h3>
+            <table id="resultsTable">
+                <thead><tr><th>Algo</th><th>Iter</th><th>Loss</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div style="margin-left:12px; font-weight:500; font-size:14px; color:#37352F;">Computing...</div>
+        </div>
+    </div>
+
+    <div class="panel panel-right">
+        <h2>Math Monitor</h2>
+        <div id="liveSection">
+            <div style="margin-bottom:20px;">
+                <h3>Agent Statistics</h3>
+                <div class="metric-card">
+                    <span class="metric-label">Current Loss f(x)</span>
+                    <span class="metric-value" id="currentLoss">0.0000</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Gradient Norm ||∇f||</span>
+                    <span class="metric-value" id="gradNorm">0.0000</span>
+                </div>
+            </div>
+            
+            <div class="metric-card" id="statusCard" style="border-left-color:var(--text-muted);">
+                <span class="metric-label">Status</span>
+                <span class="metric-value" id="statusText" style="font-size:16px;">Ready</span>
+            </div>
+            
+            <div id="validationSection" style="display:none; margin-top:16px;">
+                <h3>Validation</h3>
+                <div id="validationWarnings" style="background:#fef3c7; border:1px solid #f59e0b; border-radius:4px; padding:10px; margin-bottom:8px; display:none;">
+                    <span style="font-weight:600; color:#92400e; font-size:11px; text-transform:uppercase;">Warnings</span>
+                    <ul id="warningsList" style="margin:6px 0 0 0; padding-left:18px; font-size:12px; color:#92400e;"></ul>
+                </div>
+                <div id="validationErrors" style="background:#fee2e2; border:1px solid #ef4444; border-radius:4px; padding:10px; display:none;">
+                    <span style="font-weight:600; color:#991b1b; font-size:11px; text-transform:uppercase;">Errors</span>
+                    <ul id="errorsList" style="margin:6px 0 0 0; padding-left:18px; font-size:12px; color:#991b1b;"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- CLIENT-SIDE LOGIC ---
+const API_URL = "http://localhost:8000/simulate";
+
+// Helper for pure visual mesh generation (approximate for display only)
+const Landscapes = {
+    'Matyas': {
+        f: (x,y) => 0.26*(x*x + y*y) - 0.48*x*y,
+        start: [8, 8],
+        clamp: 80,
+        range: 10  // Range +/- 10
+    },
+    'Himmelblau': {
+        f: (x,y) => Math.pow(x*x + y - 11, 2) + Math.pow(x + y*y - 7, 2),
+        start: [0, 0],
+        clamp: 150, // Higher clamp
+        range: 5.5  // Zoomed in to +/- 5.5 to avoid giant walls
+    }
+};
+
+const app = {
+    scene: null, camera: null, renderer: null, controls: null,
+    mesh: null,
+    agents: [],
+    animationFrame: null,
+    isPlaying: false,
+    clickToSetMode: false,
+    raycaster: null,
+    mouse: new THREE.Vector2(),
+    startMarker: null,
+    
+    // We store the full path returned by Python here
+    simulationData: [],
+    frameIndex: 0,
+
+    init: function() {
+        const container = document.getElementById('canvas-container');
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0xffffff); // Pure white background
+        
+        this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        this.camera.position.set(0, -12, 12); // Slightly closer
+        this.camera.up.set(0, 0, 1);
+        
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.renderer.shadowMap.enabled = true;
+        container.appendChild(this.renderer.domElement);
+        
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        
+        // Soft Lighting
+        const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+        this.scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+        sun.position.set(5, 5, 10);
+        this.scene.add(sun);
+        
+        this.changeLandscape();
+        
+        // Initialize raycaster for click-to-set
+        this.raycaster = new THREE.Raycaster();
+        container.addEventListener('click', (e) => this.onCanvasClick(e));
+        
+        window.addEventListener('resize', () => {
+            this.camera.aspect = container.clientWidth / container.clientHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+        
+        // ESC key to cancel click-to-set mode
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.clickToSetMode) {
+                this.toggleClickToSet();
+            }
+        });
+        
+        this.animateLoop();
+    },
+
+    changeLandscape: function() {
+        const key = document.getElementById('landscapeSelect').value;
+        this.buildMesh(key);
+        this.reset();
+        
+        // Set default start position for this landscape
+        const defaultStart = Landscapes[key].start;
+        document.getElementById('startX').value = defaultStart[0];
+        document.getElementById('startY').value = defaultStart[1];
+        this.updateStartMarker(defaultStart[0], defaultStart[1]);
+        
+        // Adjust camera slightly based on landscape
+        if (key === 'Himmelblau') {
+            this.controls.target.set(0, 0, 0);
+            this.camera.position.set(0, -10, 10);
+        } else {
+            this.controls.target.set(0, 0, 0);
+            this.camera.position.set(0, -15, 15);
+        }
+    },
+
+    buildMesh: function(key) {
+        if (this.mesh) this.scene.remove(this.mesh);
+        
+        const ls = Landscapes[key];
+        const range = ls.range; 
+        const segments = 120; // Smoother
+        const geo = new THREE.PlaneGeometry(range * 2, range * 2, segments, segments);
+        
+        const pos = geo.attributes.position;
+        const colors = [];
+        const lut = new THREE.Color();
+        
+        let minZ = Infinity, maxZ = -Infinity;
+        
+        // Compute heights
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+            let z = ls.f(x, y);
+            if (z > ls.clamp) z = ls.clamp; 
+            pos.setZ(i, z);
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+        }
+        
+        // Color map - Professional Gradient
+        for (let i = 0; i < pos.count; i++) {
+            const z = pos.getZ(i);
+            // Non-linear mapping to emphasize the valley floor
+            let t = (z - minZ) / ((maxZ - minZ) || 1);
+            t = Math.pow(t, 0.5); // Gamma correction-ish
+            
+            // Blue (low) -> White (high)
+            lut.setHSL(0.6, 1.0, 0.5 + t * 0.5);
+            colors.push(lut.r, lut.g, lut.b);
+        }
+        
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+        
+        const mat = new THREE.MeshPhongMaterial({ 
+            vertexColors: true, 
+            side: THREE.DoubleSide, 
+            shininess: 10,
+            flatShading: false 
+        });
+        this.mesh = new THREE.Mesh(geo, mat);
+        this.scene.add(this.mesh);
+        
+        // Add subtle grid helper at z=0 (or slightly below minZ)
+        if (this.grid) this.scene.remove(this.grid);
+        this.grid = new THREE.GridHelper(range * 2, 20, 0x000000, 0xeeeeee);
+        this.grid.rotation.x = Math.PI/2;
+        this.grid.position.z = minZ - 0.1;
+        this.grid.material.opacity = 0.1;
+        this.grid.material.transparent = true;
+        this.scene.add(this.grid);
+    },
+
+    reset: function() {
+        this.isPlaying = false;
+        this.agents.forEach(a => {
+            this.scene.remove(a.mesh);
+            this.scene.remove(a.line);
+        });
+        this.agents = [];
+        this.simulationData = [];
+        this.frameIndex = 0;
+        
+        document.getElementById('resultsTable').querySelector('tbody').innerHTML = '';
+        document.getElementById('statusText').innerText = "Ready";
+    },
+
+    toggleClickToSet: function() {
+        this.clickToSetMode = !this.clickToSetMode;
+        const btn = document.getElementById('clickToSetBtn');
+        if (this.clickToSetMode) {
+            btn.style.background = 'var(--primary)';
+            btn.style.color = 'white';
+            btn.innerText = 'Click on Surface... (ESC to cancel)';
+            this.controls.enabled = false;
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+            btn.innerText = 'Click on Surface to Set Start';
+            this.controls.enabled = true;
+        }
+    },
+
+    onCanvasClick: function(event) {
+        if (!this.clickToSetMode) return;
+        
+        const container = document.getElementById('canvas-container');
+        const rect = container.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObject(this.mesh);
+        
+        if (intersects.length > 0) {
+            const pt = intersects[0].point;
+            document.getElementById('startX').value = pt.x.toFixed(2);
+            document.getElementById('startY').value = pt.y.toFixed(2);
+            this.updateStartMarker(pt.x, pt.y);
+        }
+        
+        // Exit click-to-set mode after successful click
+        this.toggleClickToSet();
+    },
+
+    updateStartMarker: function(x, y) {
+        const key = document.getElementById('landscapeSelect').value;
+        const ls = Landscapes[key];
+        let z = ls.f(x, y);
+        if (z > ls.clamp) z = ls.clamp;
+        
+        if (!this.startMarker) {
+            const geo = new THREE.SphereGeometry(0.35, 16, 16);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: 0xf59e0b, 
+                emissive: 0xf59e0b, 
+                emissiveIntensity: 0.6 
+            });
+            this.startMarker = new THREE.Mesh(geo, mat);
+            this.scene.add(this.startMarker);
+        }
+        this.startMarker.position.set(x, y, z + 0.25);
+        this.startMarker.visible = true;
+    },
+
+    displayValidation: function(validation) {
+        const section = document.getElementById('validationSection');
+        const warningsDiv = document.getElementById('validationWarnings');
+        const errorsDiv = document.getElementById('validationErrors');
+        const warningsList = document.getElementById('warningsList');
+        const errorsList = document.getElementById('errorsList');
+        
+        // Clear previous
+        warningsList.innerHTML = '';
+        errorsList.innerHTML = '';
+        warningsDiv.style.display = 'none';
+        errorsDiv.style.display = 'none';
+        section.style.display = 'none';
+        
+        if (!validation) return;
+        
+        const hasWarnings = validation.warnings && validation.warnings.length > 0;
+        const hasErrors = validation.errors && validation.errors.length > 0;
+        
+        if (hasWarnings) {
+            validation.warnings.forEach(w => {
+                const li = document.createElement('li');
+                li.textContent = w;
+                warningsList.appendChild(li);
+            });
+            warningsDiv.style.display = 'block';
+        }
+        
+        if (hasErrors) {
+            validation.errors.forEach(e => {
+                const li = document.createElement('li');
+                li.textContent = e;
+                errorsList.appendChild(li);
+            });
+            errorsDiv.style.display = 'block';
+        }
+        
+        if (hasWarnings || hasErrors) {
+            section.style.display = 'block';
+        }
+    },
+
+    createAgentVisual: function(name, color) {
+        const sphere = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 16, 16),
+            new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 })
+        );
+        
+        const lineGeo = new THREE.BufferGeometry();
+        // Pre-allocate buffer for up to 1000 points
+        const positions = new Float32Array(1000 * 3);
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        lineGeo.setDrawRange(0, 0);
+        
+        const lineMat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+        const line = new THREE.Line(lineGeo, lineMat);
+        
+        this.scene.add(sphere);
+        this.scene.add(line);
+        
+        return { mesh: sphere, line: line, color: color, name: name, pathPoints: [] };
+    },
+
+    runSimulation: async function() {
+        this.reset();
+        document.getElementById('loading-overlay').style.display = 'flex';
+        
+        const lsName = document.getElementById('landscapeSelect').value;
+        // Read start position from input fields
+        const startX = parseFloat(document.getElementById('startX').value);
+        const startY = parseFloat(document.getElementById('startY').value);
+        const lr = parseFloat(document.getElementById('lrSlider').value);
+        
+        // Read validation options
+        const validatePD = document.getElementById('validatePD').checked;
+        const forceRun = document.getElementById('forceRun').checked;
+        
+        // Read matrix A and vector b
+        const matrixA = [
+            [parseFloat(document.getElementById('matA00').value), parseFloat(document.getElementById('matA01').value)],
+            [parseFloat(document.getElementById('matA10').value), parseFloat(document.getElementById('matA11').value)]
+        ];
+        const vectorB = [
+            parseFloat(document.getElementById('vecB0').value),
+            parseFloat(document.getElementById('vecB1').value)
+        ];
+        
+        // Hide start marker during simulation
+        if (this.startMarker) this.startMarker.visible = false;
+        
+        const algo1 = document.getElementById('algoSelect1').value;
+        const algo2 = document.getElementById('algoSelect2').value;
+        
+        const requests = [];
+        
+        // Base request object
+        const baseReq = {
+            landscape: lsName,
+            start_x: startX,
+            start_y: startY,
+            lr: lr,
+            validate_pd: validatePD,
+            force_run: forceRun
+        };
+        
+        // Only include matrix if validation is enabled
+        if (validatePD) {
+            baseReq.matrix_a = matrixA;
+            baseReq.vector_b = vectorB;
+        }
+        
+        // Prepare requests
+        requests.push({ ...baseReq, algo: algo1 });
+        
+        if (algo2 !== "None") {
+            requests.push({ ...baseReq, algo: algo2 });
+        }
+        
+        try {
+            // Fetch data from Python Backend
+            const responses = await Promise.all(requests.map(req => 
+                fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(req)
+                }).then(res => res.json())
+            ));
+            
+            // Setup Visual Agents
+            this.agents.push(this.createAgentVisual(algo1, 0x10b981)); // Green
+            if (algo2 !== "None") {
+                this.agents.push(this.createAgentVisual(algo2, 0xef4444)); // Red
+            }
+            
+            // Store data
+            this.simulationData = responses; // Array of {path: [...], converged: bool, validation: {...}}
+            this.frameIndex = 0;
+            this.isPlaying = true;
+            
+            // Display validation warnings/errors from primary agent
+            this.displayValidation(responses[0].validation);
+            
+            // Check if simulation was skipped
+            if (responses[0].validation && responses[0].validation.skipped) {
+                this.isPlaying = false;
+                document.getElementById('statusText').innerText = "Skipped (Validation Failed)";
+                document.getElementById('statusText').style.color = "var(--danger)";
+            }
+            
+            // Init Table
+            const tbody = document.getElementById('resultsTable').querySelector('tbody');
+            this.agents.forEach((agent, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><span style="color:#${agent.color.toString(16)}">●</span> ${agent.name}</td><td id="iter-${i}">0</td><td id="loss-${i}">--</td>`;
+                tbody.appendChild(tr);
+            });
+            
+        } catch (err) {
+            alert("Error connecting to Python Backend!\nMake sure 'server.py' is running on port 8000.");
+            console.error(err);
+        } finally {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+    },
+
+    animateLoop: function() {
+        requestAnimationFrame(() => app.animateLoop());
+        
+        if (this.isPlaying) {
+            const speed = parseInt(document.getElementById('speedSlider').value);
+            // Simple logic: advance frames based on speed
+            // Since we have pre-computed paths, we can just step through the index
+            
+            // Slow down the loop to match visual preference? 
+            // Actually, let's just increment frameIndex slowly
+             // Only update every X frames or similar?
+             // Let's increment float index
+             
+            // Using a simple ticker for now
+            if (!this.lastTime) this.lastTime = Date.now();
+            const now = Date.now();
+            if (now - this.lastTime > (1000/speed)) {
+                this.stepAnimation();
+                this.lastTime = now;
+            }
+        }
+        
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+    },
+    
+    stepAnimation: function() {
+        let stillMoving = false;
+        
+        this.agents.forEach((agent, i) => {
+            const data = this.simulationData[i];
+            if (!data) return;
+            
+            const path = data.path;
+            const currentStep = Math.min(this.frameIndex, path.length - 1);
+            
+            if (currentStep < path.length - 1) stillMoving = true;
+            
+            const point = path[currentStep];
+            
+            // Update Position
+            // Apply visual clamp to match mesh
+            let z = point.z;
+            const limit = Landscapes[document.getElementById('landscapeSelect').value].clamp;
+            if (z > limit) z = limit;
+            
+            agent.mesh.position.set(point.x, point.y, z + 0.2);
+            
+            // Update Trail
+            // We need to rebuild the line up to currentStep
+            // Optimization: Just append current point to buffer?
+            // For simplicity, we redraw line up to current frame
+            const positions = agent.line.geometry.attributes.position.array;
+            let drawCount = 0;
+            for(let k=0; k<=currentStep; k++) {
+                let pz = path[k].z;
+                if (pz > limit) pz = limit;
+                positions[k*3] = path[k].x;
+                positions[k*3+1] = path[k].y;
+                positions[k*3+2] = pz + 0.1;
+                drawCount++;
+            }
+            agent.line.geometry.setDrawRange(0, drawCount);
+            agent.line.geometry.attributes.position.needsUpdate = true;
+            
+            // Update Stats (only for primary agent 0)
+            if (i === 0) {
+                document.getElementById('currentLoss').innerText = point.z.toExponential(4);
+                document.getElementById('gradNorm').innerText = point.grad_norm.toExponential(4);
+                
+                if (currentStep === path.length - 1) {
+                    const status = data.converged ? "Converged" : "Stopped";
+                    const color = data.converged ? "#22c55e" : "#eab308";
+                    const el = document.getElementById('statusText');
+                    el.innerText = status;
+                    el.style.color = color;
+                } else {
+                    document.getElementById('statusText').innerText = "Running...";
+                    document.getElementById('statusText').style.color = "#3b82f6";
+                }
+            }
+            
+            // Update Table
+            document.getElementById(`iter-${i}`).innerText = point.iter;
+            document.getElementById(`loss-${i}`).innerText = point.z.toExponential(2);
+        });
+        
+        this.frameIndex++;
+        if (!stillMoving && this.frameIndex > 1000) this.isPlaying = false; // Safety stop
+    }
+};
+
+window.onload = function() {
+    app.init();
+};
+</script>
+</body>
+</html>
